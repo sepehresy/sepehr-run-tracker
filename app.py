@@ -134,7 +134,7 @@ base = alt.Chart(df_agg).encode(
     tooltip=[df_agg.columns[0], "Distance (km)"]
 )
 
-# Choose chart style
+ Choose chart style
 if chart_style == "Bar":
     chart = base.mark_bar(size=bar_width)
 elif chart_style == "Bar + Line":
@@ -144,8 +144,10 @@ elif chart_style == "Line + Dots":
 elif chart_style == "Area + Dots":
     chart = base.mark_area(opacity=0.5, interpolate="monotone") + base.mark_point(filled=True, size=70)
 
-# If All (monthly), overlay year/quarter marks
+# ➕ Include quarter and year markers for All (monthly)
 if view == "All (monthly)":
     chart = chart + quarter_marks + year_marks
 
+# Final chart
 st.altair_chart(chart.properties(height=400), use_container_width=True)
+
