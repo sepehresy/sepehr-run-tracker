@@ -34,7 +34,7 @@ chart_style = st.selectbox(
 
 # Handle each view
 if view == "Weekly":
-    start = today - timedelta(days=today.weekday())  # Start of this week (Monday)
+    start = today - timedelta(days=today.weekday())
     days = [start + timedelta(days=i) for i in range(7)]
     df["Day"] = df["Date"].dt.strftime("%a")
     daily_km = df[df["Date"].between(start, start + timedelta(days=6))].groupby("Day")["Distance (km)"].sum()
@@ -50,9 +50,8 @@ elif view == "4 Weeks":
     start = current_week_start - timedelta(weeks=4)
     weeks = [start + timedelta(weeks=i) for i in range(5)]
     df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    weekly_km = df.groupby("Week")["Distance (km)"].sum().reindex(weeks, fill_value=0).reset_index()
-    weekly_km.columns = ["Week", "Distance (km)"]
-    df_agg = weekly_km
+    weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
+    df_agg = pd.DataFrame({"Week": weeks}).merge(weekly_km, on="Week", how="left").fillna(0)
     x_field = "Week:T"
     x_title = "Week"
     bar_width = 40
@@ -62,9 +61,8 @@ elif view == "3 Months":
     start = today - relativedelta(months=3)
     week_range = pd.date_range(start=start, end=today, freq="W-MON")
     df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    weekly_km = df.groupby("Week")["Distance (km)"].sum().reindex(week_range, fill_value=0).reset_index()
-    weekly_km.columns = ["Week", "Distance (km)"]
-    df_agg = weekly_km
+    weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
+    df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
     x_field = "Week:T"
     x_title = "Week"
     bar_width = 10
@@ -74,9 +72,8 @@ elif view == "6 Months":
     start = today - relativedelta(months=6)
     week_range = pd.date_range(start=start, end=today, freq="W-MON")
     df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    weekly_km = df.groupby("Week")["Distance (km)"].sum().reindex(week_range, fill_value=0).reset_index()
-    weekly_km.columns = ["Week", "Distance (km)"]
-    df_agg = weekly_km
+    weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
+    df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
     x_field = "Week:T"
     x_title = "Week"
     bar_width = 8
@@ -85,11 +82,11 @@ elif view == "6 Months":
 elif view == "1 Year":
     months = [(today.replace(day=1) - relativedelta(months=12 - i)) for i in range(13)]
     df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
-    monthly_km = df.groupby("Month")["Distance (km)"].sum().reindex(months, fill_value=0).reset_index()
-    monthly_km.columns = ["Month", "Distance (km)"]
-    monthly_km["Month Label"] = monthly_km["Month"].dt.strftime("%b %Y")
-    month_label_order = monthly_km["Month Label"].tolist()
-    df_agg = monthly_km
+    monthly_km = df.groupby("Month")["Distance (km)"].sum().reset_index()
+    df_months = pd.DataFrame({"Month": months}).merge(monthly_km, on="Month", how="left").fillna(0)
+    df_months["Month Label"] = df_months["Month"].dt.strftime("%b %Y")
+    month_label_order = df_months["Month Label"].tolist()
+    df_agg = df_months
     x_field = "Month Label:N"
     x_title = "Month"
     bar_width = 20
@@ -111,14 +108,14 @@ else:  # All Yearly
     bar_width = 30
     x_axis = alt.Axis(title=x_title)
 
-# Build base chart
+# Base chart
 base = alt.Chart(df_agg).encode(
     x=alt.X(x_field, title=x_title, axis=x_axis, sort=month_label_order if view == "1 Year" else None),
     y=alt.Y("Distance (km):Q", title="Distance (km)"),
     tooltip=[df_agg.columns[0], "Distance (km)"]
 )
 
-# Render chosen chart style
+# Render chart
 if chart_style == "Bar":
     chart = base.mark_bar(size=bar_width)
 elif chart_style == "Bar + Line":
@@ -128,5 +125,4 @@ elif chart_style == "Line + Dots":
 elif chart_style == "Area + Dots":
     chart = base.mark_area(opacity=0.5, interpolate="monotone") + base.mark_point(filled=True, size=70)
 
-# Display chart
 st.altair_chart(chart.properties(height=400), use_container_width=True)
