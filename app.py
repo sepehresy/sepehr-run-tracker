@@ -25,89 +25,97 @@ view = st.radio(
     horizontal=True
 )
 
+# Chart style toggle
+chart_style = st.selectbox(
+    "Chart Style",
+    ["Bar", "Line", "Dots", "Area", "Line + Dots"],
+    index=0
+)
+
+# Handle views
 if view == "Weekly":
     start = today - timedelta(days=today.weekday())  # Monday
     days = [start + timedelta(days=i) for i in range(7)]
     df_week = df[df["Date"].between(start, start + timedelta(days=6))].copy()
     df_week["Day"] = df_week["Date"].dt.strftime("%a")
     daily_km = df_week.groupby("Day")["Distance (km)"].sum()
-    full_week = pd.DataFrame({"Day": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]})
-    full_week["Distance (km)"] = full_week["Day"].map(daily_km).fillna(0)
-    chart = alt.Chart(full_week).mark_bar(size=60).encode(
-        x=alt.X("Day:N", title="Day", sort=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
-        y=alt.Y("Distance (km):Q", title="Distance (km)"),
-        tooltip=["Day", "Distance (km)"]
-    ).properties(height=400)
+    df_agg = pd.DataFrame({"Day": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]})
+    df_agg["Distance (km)"] = df_agg["Day"].map(daily_km).fillna(0)
+    x_field = "Day:N"
+    x_title = "Day"
+    bar_width = 60
 
 elif view == "4 Weeks":
-    # Get start of current week (Monday)
     current_week_start = today - timedelta(days=today.weekday())
     start = current_week_start - timedelta(weeks=4)
-    end = current_week_start + timedelta(days=6)
-    
-    df_4w = df[(df["Date"] >= start) & (df["Date"] <= end)].copy()
-    df_4w["Week"] = df_4w["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    
-    # Ensure all 5 weeks are represented (even if zero distance)
     weeks = [start + timedelta(weeks=i) for i in range(5)]
+    df_4w = df[df["Date"].between(start, current_week_start + timedelta(days=6))].copy()
+    df_4w["Week"] = df_4w["Date"].dt.to_period("W").apply(lambda r: r.start_time)
     df_agg = df_4w.groupby("Week")["Distance (km)"].sum().reindex(weeks, fill_value=0).reset_index()
     df_agg.columns = ["Week", "Distance (km)"]
-
-    chart = alt.Chart(df_agg).mark_bar(size=40).encode(
-        x=alt.X("Week:T", title="Week"),
-        y=alt.Y("Distance (km):Q", title="Distance (km)"),
-        tooltip=["Week", "Distance (km)"]
-    ).properties(height=400)
+    x_field = "Week:T"
+    x_title = "Week"
+    bar_width = 40
 
 elif view == "3 Months":
     start = today - relativedelta(months=3)
-    df_qtr = df[df["Date"] >= start].copy()
-    df_qtr["Week"] = df_qtr["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    weekly_km = df_qtr.groupby("Week")["Distance (km)"].sum().reset_index()
-    chart = alt.Chart(weekly_km).mark_bar(size=10).encode(
-        x=alt.X("Week:T", title="Week"),
-        y=alt.Y("Distance (km):Q", title="Distance (km)"),
-        tooltip=["Week", "Distance (km)"]
-    ).properties(height=400)
+    df_range = df[df["Date"] >= start].copy()
+    df_range["Week"] = df_range["Date"].dt.to_period("W").apply(lambda r: r.start_time)
+    df_agg = df_range.groupby("Week")["Distance (km)"].sum().reset_index()
+    x_field = "Week:T"
+    x_title = "Week"
+    bar_width = 10
 
 elif view == "6 Months":
     start = today - relativedelta(months=6)
-    df_half = df[df["Date"] >= start].copy()
-    df_half["Week"] = df_half["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    weekly_km = df_half.groupby("Week")["Distance (km)"].sum().reset_index()
-    chart = alt.Chart(weekly_km).mark_bar(size=8).encode(
-        x=alt.X("Week:T", title="Week"),
-        y=alt.Y("Distance (km):Q", title="Distance (km)"),
-        tooltip=["Week", "Distance (km)"]
-    ).properties(height=400)
+    df_range = df[df["Date"] >= start].copy()
+    df_range["Week"] = df_range["Date"].dt.to_period("W").apply(lambda r: r.start_time)
+    df_agg = df_range.groupby("Week")["Distance (km)"].sum().reset_index()
+    x_field = "Week:T"
+    x_title = "Week"
+    bar_width = 8
 
 elif view == "1 Year":
     start = today - relativedelta(years=1)
-    df_year = df[df["Date"] >= start].copy()
-    df_year["Month"] = df_year["Date"].dt.to_period("M").apply(lambda r: r.start_time)
-    monthly_km = df_year.groupby("Month")["Distance (km)"].sum().reset_index()
-    chart = alt.Chart(monthly_km).mark_bar(size=20).encode(
-        x=alt.X("Month:T", title="Month"),
-        y=alt.Y("Distance (km):Q", title="Distance (km)"),
-        tooltip=["Month", "Distance (km)"]
-    ).properties(height=400)
+    df_range = df[df["Date"] >= start].copy()
+    df_range["Month"] = df_range["Date"].dt.to_period("M").apply(lambda r: r.start_time)
+    df_agg = df_range.groupby("Month")["Distance (km)"].sum().reset_index()
+    x_field = "Month:T"
+    x_title = "Month"
+    bar_width = 20
 
 elif view == "All Months":
     df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
-    monthly_km = df.groupby("Month")["Distance (km)"].sum().reset_index()
-    chart = alt.Chart(monthly_km).mark_bar(size=10).encode(
-        x=alt.X("Month:T", title="Month"),
-        y=alt.Y("Distance (km):Q", title="Distance (km)"),
-        tooltip=["Month", "Distance (km)"]
-    ).properties(height=400)
+    df_agg = df.groupby("Month")["Distance (km)"].sum().reset_index()
+    x_field = "Month:T"
+    x_title = "Month"
+    bar_width = 10
 
 else:  # All Yearly
     df["Year"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
-    yearly_km = df.groupby("Year")["Distance (km)"].sum().reset_index()
-    chart = alt.Chart(yearly_km).mark_bar(size=30).encode(
-        x=alt.X("Year:T", title="Year"),
-        y=alt.Y("Distance (km):Q", title="Distance (km)"),
-        tooltip=["Year", "Distance (km)"]
-    ).properties(height=400)
+    df_agg = df.groupby("Year")["Distance (km)"].sum().reset_index()
+    x_field = "Year:T"
+    x_title = "Year"
+    bar_width = 30
 
-st.altair_chart(chart, use_container_width=True)
+# Base chart
+base = alt.Chart(df_agg).encode(
+    x=alt.X(x_field, title=x_title),
+    y=alt.Y("Distance (km):Q", title="Distance (km)"),
+    tooltip=[df_agg.columns[0], "Distance (km)"]
+)
+
+# Style renderer
+if chart_style == "Bar":
+    chart = base.mark_bar(size=bar_width)
+elif chart_style == "Line":
+    chart = base.mark_line(strokeWidth=2)
+elif chart_style == "Dots":
+    chart = base.mark_point(filled=True, size=80)
+elif chart_style == "Area":
+    chart = base.mark_area(opacity=0.5)
+elif chart_style == "Line + Dots":
+    chart = base.mark_line(point=True, strokeWidth=2)
+
+# Show chart
+st.altair_chart(chart.properties(height=400), use_container_width=True)
