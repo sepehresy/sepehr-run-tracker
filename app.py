@@ -25,7 +25,7 @@ view = st.radio(
     horizontal=True
 )
 
-# Chart style toggle (restricted to 4 meaningful options)
+# Chart style toggle (4 useful options)
 chart_style = st.selectbox(
     "Chart Style",
     ["Bar", "Bar + Line", "Line + Dots", "Area + Dots"],
@@ -43,6 +43,7 @@ if view == "Weekly":
     x_field = "Day:N"
     x_title = "Day"
     bar_width = 60
+    x_axis = alt.Axis(title=x_title)
 
 elif view == "4 Weeks":
     current_week_start = today - timedelta(days=today.weekday())
@@ -55,6 +56,7 @@ elif view == "4 Weeks":
     x_field = "Week:T"
     x_title = "Week"
     bar_width = 40
+    x_axis = alt.Axis(title=x_title)
 
 elif view == "3 Months":
     start = today - relativedelta(months=3)
@@ -64,6 +66,7 @@ elif view == "3 Months":
     x_field = "Week:T"
     x_title = "Week"
     bar_width = 10
+    x_axis = alt.Axis(title=x_title)
 
 elif view == "6 Months":
     start = today - relativedelta(months=6)
@@ -73,16 +76,14 @@ elif view == "6 Months":
     x_field = "Week:T"
     x_title = "Week"
     bar_width = 8
+    x_axis = alt.Axis(title=x_title)
 
 elif view == "1 Year":
-    # Create list of 13 months: from 12 months ago to current month
+    # Build 13 months from 12 months ago to current month
     months = [(today.replace(day=1) - relativedelta(months=12 - i)) for i in range(13)]
-
     df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
     monthly_km = df.groupby("Month")["Distance (km)"].sum().reindex(months, fill_value=0).reset_index()
     monthly_km.columns = ["Month", "Distance (km)"]
-    
-    # Format month labels and define sort order
     monthly_km["Month Label"] = monthly_km["Month"].dt.strftime("%b %Y")
     month_label_order = monthly_km["Month Label"].tolist()
 
@@ -90,8 +91,7 @@ elif view == "1 Year":
     x_field = "Month Label:N"
     x_title = "Month"
     bar_width = 20
-    x_axis = alt.Axis(title=x_title, labelAngle=-45, labelFontSize=11, labelColor="#ccc")
-
+    x_axis = alt.Axis(title=x_title, labelAngle=-45)
 
 elif view == "All Months":
     df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
@@ -99,6 +99,7 @@ elif view == "All Months":
     x_field = "Month:T"
     x_title = "Month"
     bar_width = 10
+    x_axis = alt.Axis(title=x_title)
 
 else:  # All Yearly
     df["Year"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
@@ -106,29 +107,24 @@ else:  # All Yearly
     x_field = "Year:T"
     x_title = "Year"
     bar_width = 30
+    x_axis = alt.Axis(title=x_title)
 
-# Base chart encoding
+# Base chart
 base = alt.Chart(df_agg).encode(
-    x=alt.X(x_field, title=x_title),
+    x=alt.X(x_field, title=x_title, axis=x_axis, sort=month_label_order if view == "1 Year" else None),
     y=alt.Y("Distance (km):Q", title="Distance (km)"),
     tooltip=[df_agg.columns[0], "Distance (km)"]
 )
 
-# Chart style renderer
+# Chart renderer
 if chart_style == "Bar":
     chart = base.mark_bar(size=bar_width)
 elif chart_style == "Bar + Line":
-    bars = base.mark_bar(size=bar_width)
-    line = base.mark_line(strokeWidth=2, color="orange")
-    chart = bars + line
+    chart = base.mark_bar(size=bar_width) + base.mark_line(strokeWidth=2, color="orange")
 elif chart_style == "Line + Dots":
-    line = base.mark_line(strokeWidth=2)
-    dots = base.mark_point(filled=True, size=70)
-    chart = line + dots
+    chart = base.mark_line(strokeWidth=2) + base.mark_point(filled=True, size=70)
 elif chart_style == "Area + Dots":
-    area = base.mark_area(opacity=0.5)
-    dots = base.mark_point(filled=True, size=70)
-    chart = area + dots
+    chart = base.mark_area(opacity=0.5) + base.mark_point(filled=True, size=70)
 
 # Show chart
 st.altair_chart(chart.properties(height=400), use_container_width=True)
