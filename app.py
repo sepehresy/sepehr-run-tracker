@@ -93,9 +93,7 @@ elif view == "1 Year":
 
 elif view == "All (monthly)":
     df["MonthStart"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
-    all_months = pd.date_range(start=df["MonthStart"].min(), end=df["MonthStart"].max(), freq='MS')
-    monthly_km = df.groupby("MonthStart")["Distance (km)"].sum().reindex(all_months, fill_value=0).reset_index()
-    monthly_km.columns = ["MonthStart", "Distance (km)"]
+    monthly_km = df.groupby("MonthStart")["Distance (km)"].sum().reset_index()
     monthly_km["Year"] = monthly_km["MonthStart"].dt.year
     monthly_km["Quarter"] = "Q" + monthly_km["MonthStart"].dt.quarter.astype(str)
     monthly_km["MonthName"] = monthly_km["MonthStart"].dt.strftime("%b")
@@ -105,17 +103,18 @@ elif view == "All (monthly)":
     bar_width = 10
     x_axis = alt.Axis(title=x_title, labelAngle=-45, labelFontSize=10)
 
-    quarter_labels = df_agg.drop_duplicates(subset=["Quarter", "Year"])
-    quarter_labels["Label"] = quarter_labels["Quarter"] + " " + quarter_labels["Year"].astype(str)
-    year_labels = df_agg.drop_duplicates(subset=["Year"])
-    year_labels["Label"] = year_labels["Year"].astype(str)
-
-    quarter_marks = alt.Chart(quarter_labels).mark_text(dy=-180, fontSize=10, fontWeight="bold").encode(
-        x="MonthStart:T", text="Label"
+    # Multi-layered x-axis labels
+    month_labels = alt.Chart(df_agg).mark_text(dy=10, fontSize=10).encode(
+        x="MonthStart:T", text="MonthName:N"
     )
-    year_marks = alt.Chart(year_labels).mark_text(dy=-200, fontSize=12, fontWeight="bold").encode(
-        x="MonthStart:T", text="Label"
-    )
+    quarter_labels = alt.Chart(df_agg.drop_duplicates(subset=["Quarter", "Year"]))\
+        .mark_text(dy=-180, fontSize=10, fontWeight="bold").encode(
+            x="MonthStart:T", text=alt.Text("Quarter:N")
+        )
+    year_labels = alt.Chart(df_agg.drop_duplicates(subset=["Year"]))\
+        .mark_text(dy=-200, fontSize=12, fontWeight="bold").encode(
+            x="MonthStart:T", text=alt.Text("Year:O")
+        )
 
 elif view == "All Yearly":
     df["Year"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
@@ -143,6 +142,6 @@ elif chart_style == "Area + Dots":
     chart = base.mark_area(opacity=0.5, interpolate="monotone") + base.mark_point(filled=True, size=70)
 
 if view == "All (monthly)":
-    chart = chart + quarter_marks + year_marks
+    chart = chart + year_labels + quarter_labels + month_labels
 
 st.altair_chart(chart.properties(height=400), use_container_width=True)
