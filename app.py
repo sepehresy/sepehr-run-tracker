@@ -17,15 +17,14 @@ df = load_data()
 df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
 # Garmin-style total distance chart
-st.subheader("📊 Total Distance")
+st.subheader("📊 Total Distance (Garmin Style View)")
 
-# State
 if "distance_view" not in st.session_state:
     st.session_state.distance_view = "7 Days"
 if "nav_offset" not in st.session_state:
     st.session_state.nav_offset = 0
 
-col1, col2, col3 = st.columns([1, 4, 1])
+col1, col2, col3, col4 = st.columns([1, 4, 1, 1])
 with col1:
     if st.button("←"):
         st.session_state.nav_offset -= 1
@@ -40,6 +39,7 @@ with col2:
         horizontal=True
     )
     st.session_state.distance_view = distance_view
+with col4:
     if st.button("Today"):
         st.session_state.nav_offset = 0
 
@@ -47,21 +47,7 @@ view = st.session_state.distance_view
 offset = st.session_state.nav_offset
 today = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
 
-bar_widths = {
-    "7 Days": 40,
-    "4 Weeks": 25,
-    "6 Months": 15,
-    "1 Year": 10,
-    "All": 6,
-}
-
-label_formats = {
-    "7 Days": "%a",
-    "4 Weeks": "Week %U",
-    "6 Months": "%b",
-    "1 Year": "%b",
-    "All": "%Y",
-}
+bar_widths = {"7 Days": 40, "4 Weeks": 25, "6 Months": 15, "1 Year": 10, "All": 6}
 
 if view == "7 Days":
     start = today - timedelta(days=6) + timedelta(weeks=offset)
@@ -97,7 +83,6 @@ else:
         x_title = "Year"
 
 total_by = df_range.groupby("Group")["Distance (km)"].sum().reset_index()
-
 chart = alt.Chart(total_by).mark_bar(size=bar_widths[view]).encode(
     x=alt.X("Group:N", title=x_title),
     y=alt.Y("Distance (km):Q", title="Distance (km)"),
@@ -106,7 +91,7 @@ chart = alt.Chart(total_by).mark_bar(size=bar_widths[view]).encode(
 
 st.altair_chart(chart, use_container_width=True)
 
-# Summary Filters
+# Sidebar filters for classic views
 st.sidebar.subheader("🗓️ Filter by Time Range")
 time_range = st.sidebar.selectbox(
     "Select time range",
@@ -119,14 +104,14 @@ group_by = st.sidebar.selectbox(
     ["Daily", "Weekly", "Monthly", "Yearly"]
 )
 
-# Time range logic
+now = pd.to_datetime(datetime.now())
 range_mapping = {
-    "1 Week": today - timedelta(weeks=1),
-    "1 Month": today - timedelta(weeks=4),
-    "3 Months": today - timedelta(weeks=13),
-    "6 Months": today - timedelta(weeks=26),
-    "1 Year": today - timedelta(weeks=52),
-    "2 Years": today - timedelta(weeks=104),
+    "1 Week": now - timedelta(weeks=1),
+    "1 Month": now - timedelta(weeks=4),
+    "3 Months": now - timedelta(weeks=13),
+    "6 Months": now - timedelta(weeks=26),
+    "1 Year": now - timedelta(weeks=52),
+    "2 Years": now - timedelta(weeks=104),
     "All": pd.to_datetime("2000-01-01")
 }
 cutoff = range_mapping[time_range]
@@ -139,7 +124,7 @@ col1.metric("Total Distance", f"{df_filtered['Distance (km)'].sum():.1f} km")
 col2.metric("Avg Pace", f"{df_filtered['Pace (min/km)'].mean():.2f} min/km")
 col3.metric("Avg Heart Rate", f"{df_filtered['Avg HR'].mean():.0f} bpm")
 
-# Distance Grouped Chart
+# Grouped distance chart
 if group_by == "Daily":
     df_filtered["Period"] = df_filtered["Date"].dt.date
 elif group_by == "Weekly":
@@ -170,7 +155,7 @@ if run_names:
     st.write(f"**Pace**: {run['Pace (min/km)']} min/km")
     st.write(f"**Heart Rate**: {run['Avg HR']} bpm")
 
-# Countdown
+# Race countdown
 race_day = datetime(2025, 5, 24)
 days_left = (race_day - datetime.today()).days
 st.markdown(f"### 🗓️ {days_left} days left until race day (May 24, 2025)")
