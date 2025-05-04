@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 st.set_page_config(page_title="Running Dashboard", layout="wide")
-st.title("🏃 Summary Statistics")
+st.title("\ud83c\udfc3 Summary Statistics")
 
 # Load data
 sheet_url = st.secrets["gsheet_url"]
@@ -134,7 +134,7 @@ base = alt.Chart(df_agg).encode(
     tooltip=[df_agg.columns[0], "Distance (km)"]
 )
 
- Choose chart style
+# Choose chart style
 if chart_style == "Bar":
     chart = base.mark_bar(size=bar_width)
 elif chart_style == "Bar + Line":
@@ -144,10 +144,9 @@ elif chart_style == "Line + Dots":
 elif chart_style == "Area + Dots":
     chart = base.mark_area(opacity=0.5, interpolate="monotone") + base.mark_point(filled=True, size=70)
 
-# ➕ Include quarter and year markers for All (monthly)
+# If All (monthly), overlay year/quarter marks
 if view == "All (monthly)":
     chart = chart + quarter_marks + year_marks
 
 # Final chart
 st.altair_chart(chart.properties(height=400), use_container_width=True)
-
