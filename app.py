@@ -32,7 +32,7 @@ chart_style = st.selectbox(
     index=0
 )
 
-# View logic
+# Determine data grouping and formatting
 if view == "Weekly":
     start = today - timedelta(days=today.weekday())  # Monday
     days = [start + timedelta(days=i) for i in range(7)]
@@ -78,34 +78,36 @@ elif view in ["1 Year", "All Months"]:
     else:
         df_range = df.copy()
     df_agg = df_range.groupby("Month")["Distance (km)"].sum().reset_index()
-    x_field = "Month:T"
+    df_agg["Month Label"] = df_agg["Month"].dt.strftime('%b\n%Y')
+    x_field = "Month Label:N"
     x_title = "Month"
     bar_width = 20 if view == "1 Year" else 10
     x_axis = alt.Axis(
         title=x_title,
-        format="%b %Y",
-        labelAngle=-45,
-        labelFlush=True
+        labelAngle=0,
+        labelAlign='center',
+        labelFontSize=11
     )
 
 else:  # All Yearly
     df["Year"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
     df_agg = df.groupby("Year")["Distance (km)"].sum().reset_index()
-    x_field = "Year:T"
+    df_agg["Year Label"] = df_agg["Year"].dt.strftime('%Y')
+    x_field = "Year Label:N"
     x_title = "Year"
     bar_width = 30
     x_axis = alt.Axis(
         title=x_title,
-        format="%Y",
         labelAngle=0,
-        labelFlush=True
+        labelAlign='center',
+        labelFontSize=12
     )
 
 # Base chart
 base = alt.Chart(df_agg).encode(
     x=alt.X(x_field, axis=x_axis),
     y=alt.Y("Distance (km):Q", title="Distance (km)"),
-    tooltip=[df_agg.columns[0], "Distance (km)"]
+    tooltip=[alt.Tooltip("Distance (km):Q", format=".2f")]
 )
 
 # Chart renderer
