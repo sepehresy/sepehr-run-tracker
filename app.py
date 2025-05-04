@@ -75,11 +75,15 @@ elif view == "6 Months":
     bar_width = 8
 
 elif view == "1 Year":
-    start = today - relativedelta(years=1)
-    df_range = df[df["Date"] >= start].copy()
-    df_range["Month"] = df_range["Date"].dt.to_period("M").apply(lambda r: r.start_time)
-    df_agg = df_range.groupby("Month")["Distance (km)"].sum().reset_index()
-    x_field = "Month:T"
+    # Generate full list of past 13 months up to and including current month
+    months = [ (today.replace(day=1) - relativedelta(months=i)) for i in reversed(range(13)) ]
+    df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
+    monthly_km = df.groupby("Month")["Distance (km)"].sum().reindex(months, fill_value=0).reset_index()
+    monthly_km.columns = ["Month", "Distance (km)"]
+    monthly_km["Month Label"] = monthly_km["Month"].dt.strftime("%b %Y")
+
+    df_agg = monthly_km
+    x_field = "Month Label:N"
     x_title = "Month"
     bar_width = 20
 
