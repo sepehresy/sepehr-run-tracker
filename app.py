@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 st.set_page_config(page_title="Running Dashboard", layout="wide")
-st.title("🏃 Summary Statistics")
+st.title("🏃 Summary Statistics (v1.0.0)")
 
 # Load data
 sheet_url = st.secrets["gsheet_url"]
@@ -101,9 +101,9 @@ elif view == "All (monthly)":
     x_axis = alt.Axis(title=x_title, labelAngle=-45, labelFontSize=10)
 
     # Year divider rule lines
-    year_lines = alt.Chart(df_agg[df_agg["MonthStart"].dt.month == 1]).mark_rule(strokeDash=[4,4], color="gray").encode(
-        x="MonthStart:T"
-    )
+    year_lines = alt.Chart(df_agg[df_agg["MonthStart"].dt.month == 1]).mark_rule(
+        strokeDash=[4, 4], color="gray"
+    ).encode(x="MonthStart:T")
 
 elif view == "All Yearly":
     df["Year"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
