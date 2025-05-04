@@ -21,7 +21,7 @@ today = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
 # View toggle
 view = st.radio(
     "Select View",
-    ["Weekly", "4 Weeks", "3 Months", "6 Months", "1 Year", "All Months", "All Yearly"],
+    ["Weekly", "4 Weeks", "3 Months", "6 Months", "1 Year", "All (monthly)", "All Yearly"],
     horizontal=True
 )
 
@@ -92,15 +92,21 @@ elif view == "1 Year":
     bar_width = 20
     x_axis = alt.Axis(title=x_title, labelAngle=-45)
 
-elif view == "All Months":
-    df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
-    df_agg = df.groupby("Month")["Distance (km)"].sum().reset_index()
-    x_field = "Month:T"
-    x_title = "Month"
+elif view == "All (monthly)":
+    df["MonthStart"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
+    monthly_km = df.groupby("MonthStart")["Distance (km)"].sum().reset_index()
+    monthly_km["Year"] = monthly_km["MonthStart"].dt.year
+    monthly_km["Quarter"] = monthly_km["MonthStart"].dt.quarter
+    monthly_km["MonthName"] = monthly_km["MonthStart"].dt.strftime("%b")
+    monthly_km["MultiLabel"] = monthly_km["Year"].astype(str) + " | Q" + monthly_km["Quarter"].astype(str) + " | " + monthly_km["MonthName"]
+    
+    df_agg = monthly_km
+    x_field = "MultiLabel:N"
+    x_title = "Year | Quarter | Month"
     bar_width = 10
-    x_axis = alt.Axis(title=x_title)
+    x_axis = alt.Axis(title=x_title, labelAngle=-45, labelFontSize=10)
 
-else:  # All Yearly
+elif view == "All Yearly":
     df["Year"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
     df_agg = df.groupby("Year")["Distance (km)"].sum().reset_index()
     x_field = "Year:T"
@@ -110,7 +116,7 @@ else:  # All Yearly
 
 # Base chart
 base = alt.Chart(df_agg).encode(
-    x=alt.X(x_field, title=x_title, axis=x_axis, sort=month_label_order if view == "1 Year" else None),
+    x=alt.X(x_field, title=x_title, axis=x_axis, sort=df_agg[x_field].tolist() if x_field.endswith(":N") else None),
     y=alt.Y("Distance (km):Q", title="Distance (km)"),
     tooltip=[df_agg.columns[0], "Distance (km)"]
 )
