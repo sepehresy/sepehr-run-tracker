@@ -40,11 +40,20 @@ if view == "Weekly":
     ).properties(height=400)
 
 elif view == "4 Weeks":
-    start = today - timedelta(weeks=4)
-    df_month = df[df["Date"] >= start].copy()
-    df_month["Week"] = df_month["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    weekly_km = df_month.groupby("Week")["Distance (km)"].sum().reset_index()
-    chart = alt.Chart(weekly_km).mark_bar(size=40).encode(
+    # Get start of current week (Monday)
+    current_week_start = today - timedelta(days=today.weekday())
+    start = current_week_start - timedelta(weeks=4)
+    end = current_week_start + timedelta(days=6)
+    
+    df_4w = df[(df["Date"] >= start) & (df["Date"] <= end)].copy()
+    df_4w["Week"] = df_4w["Date"].dt.to_period("W").apply(lambda r: r.start_time)
+    
+    # Ensure all 5 weeks are represented (even if zero distance)
+    weeks = [start + timedelta(weeks=i) for i in range(5)]
+    df_agg = df_4w.groupby("Week")["Distance (km)"].sum().reindex(weeks, fill_value=0).reset_index()
+    df_agg.columns = ["Week", "Distance (km)"]
+
+    chart = alt.Chart(df_agg).mark_bar(size=40).encode(
         x=alt.X("Week:T", title="Week"),
         y=alt.Y("Distance (km):Q", title="Distance (km)"),
         tooltip=["Week", "Distance (km)"]
