@@ -25,17 +25,16 @@ view = st.radio(
     horizontal=True
 )
 
-# Chart style toggle
+# Chart style toggle (restricted to 4 meaningful options)
 chart_style = st.selectbox(
     "Chart Style",
-    ["Bar", "Line", "Dots", "Area", "Line + Dots"],
+    ["Bar", "Bar + Line", "Line + Dots", "Area + Dots"],
     index=0
 )
 
 # Handle views
 if view == "Weekly":
     start = today - timedelta(days=today.weekday())  # Monday
-    days = [start + timedelta(days=i) for i in range(7)]
     df_week = df[df["Date"].between(start, start + timedelta(days=6))].copy()
     df_week["Day"] = df_week["Date"].dt.strftime("%a")
     daily_km = df_week.groupby("Day")["Distance (km)"].sum()
@@ -98,24 +97,28 @@ else:  # All Yearly
     x_title = "Year"
     bar_width = 30
 
-# Base chart
+# Base chart encoding
 base = alt.Chart(df_agg).encode(
     x=alt.X(x_field, title=x_title),
     y=alt.Y("Distance (km):Q", title="Distance (km)"),
     tooltip=[df_agg.columns[0], "Distance (km)"]
 )
 
-# Chart renderer
+# Chart style renderer
 if chart_style == "Bar":
     chart = base.mark_bar(size=bar_width)
-elif chart_style == "Line":
-    chart = base.mark_line(strokeWidth=2)
-elif chart_style == "Dots":
-    chart = base.mark_point(filled=True, size=80)
-elif chart_style == "Area":
-    chart = base.mark_area(opacity=0.5)
+elif chart_style == "Bar + Line":
+    bars = base.mark_bar(size=bar_width)
+    line = base.mark_line(strokeWidth=2, color="orange")
+    chart = bars + line
 elif chart_style == "Line + Dots":
-    chart = base.mark_line(point=True, strokeWidth=2)
+    line = base.mark_line(strokeWidth=2)
+    dots = base.mark_point(filled=True, size=70)
+    chart = line + dots
+elif chart_style == "Area + Dots":
+    area = base.mark_area(opacity=0.5)
+    dots = base.mark_point(filled=True, size=70)
+    chart = area + dots
 
 # Show chart
 st.altair_chart(chart.properties(height=400), use_container_width=True)
