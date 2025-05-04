@@ -98,7 +98,8 @@ else:  # All
         x_field = "Year"
         chart_title = "Distance by Year"
 
-chart = alt.Chart(total_by).mark_bar(cornerRadiusTop=3).encode(
+# ✅ FIXED chart - removed unsupported cornerRadiusTop
+chart = alt.Chart(total_by).mark_bar().encode(
     x=alt.X(f"{x_field}:T", title=None),
     y=alt.Y("Distance (km):Q", title="Kilometers"),
     tooltip=[x_field, "Distance (km)"]
@@ -122,7 +123,7 @@ else:
 agg_km = df_filtered.groupby("Period")["Distance (km)"].sum().reset_index()
 bar_size = {"Daily": 20, "Weekly": 10, "Monthly": 5, "Yearly": 2}.get(group_by, 10)
 
-# Distance Chart (classic)
+# Classic Distance Chart
 st.subheader(f"📊 Total Distance ({group_by}) — {time_range}")
 chart = alt.Chart(agg_km).mark_bar(size=bar_size).encode(
     x=alt.X('Period:T', title=group_by),
