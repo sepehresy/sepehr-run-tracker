@@ -75,8 +75,9 @@ elif view == "6 Months":
     bar_width = 8
 
 elif view == "1 Year":
-    # Generate full list of past 13 months up to and including current month
-    months = [ (today.replace(day=1) - relativedelta(months=i)) for i in reversed(range(13)) ]
+    # Generate list from 12 months ago up to current month (inclusive)
+    months = [(today.replace(day=1) - relativedelta(months=12 - i)) for i in range(13)]
+    
     df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
     monthly_km = df.groupby("Month")["Distance (km)"].sum().reindex(months, fill_value=0).reset_index()
     monthly_km.columns = ["Month", "Distance (km)"]
