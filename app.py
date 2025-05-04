@@ -16,7 +16,97 @@ def load_data():
 df = load_data()
 df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-# Sidebar filters
+# Garmin-style total distance chart
+st.subheader("📊 Total Distance")
+
+# State
+if "distance_view" not in st.session_state:
+    st.session_state.distance_view = "7 Days"
+if "nav_offset" not in st.session_state:
+    st.session_state.nav_offset = 0
+
+col1, col2, col3 = st.columns([1, 4, 1])
+with col1:
+    if st.button("←"):
+        st.session_state.nav_offset -= 1
+with col3:
+    if st.button("→"):
+        st.session_state.nav_offset += 1
+with col2:
+    distance_view = st.radio(
+        "View",
+        ["7 Days", "4 Weeks", "6 Months", "1 Year", "All"],
+        index=["7 Days", "4 Weeks", "6 Months", "1 Year", "All"].index(st.session_state.distance_view),
+        horizontal=True
+    )
+    st.session_state.distance_view = distance_view
+    if st.button("Today"):
+        st.session_state.nav_offset = 0
+
+view = st.session_state.distance_view
+offset = st.session_state.nav_offset
+today = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
+
+bar_widths = {
+    "7 Days": 40,
+    "4 Weeks": 25,
+    "6 Months": 15,
+    "1 Year": 10,
+    "All": 6,
+}
+
+label_formats = {
+    "7 Days": "%a",
+    "4 Weeks": "Week %U",
+    "6 Months": "%b",
+    "1 Year": "%b",
+    "All": "%Y",
+}
+
+if view == "7 Days":
+    start = today - timedelta(days=6) + timedelta(weeks=offset)
+    end = start + timedelta(days=6)
+    df_range = df[(df["Date"] >= start) & (df["Date"] <= end)]
+    df_range["Group"] = df_range["Date"].dt.strftime("%a")
+    x_title = "Day"
+elif view == "4 Weeks":
+    start = today - timedelta(weeks=4) + timedelta(weeks=4 * offset)
+    end = start + timedelta(weeks=4)
+    df_range = df[(df["Date"] >= start) & (df["Date"] <= end)]
+    df_range["Group"] = df_range["Date"].dt.to_period("W").apply(lambda r: r.start_time.strftime("%b %d"))
+    x_title = "Week"
+elif view == "6 Months":
+    start = today - pd.DateOffset(months=6) + pd.DateOffset(months=6 * offset)
+    end = start + pd.DateOffset(months=6)
+    df_range = df[(df["Date"] >= start) & (df["Date"] <= end)]
+    df_range["Group"] = df_range["Date"].dt.to_period("M").apply(lambda r: r.start_time.strftime("%b"))
+    x_title = "Month"
+elif view == "1 Year":
+    start = today - pd.DateOffset(months=12) + pd.DateOffset(months=12 * offset)
+    end = start + pd.DateOffset(months=12)
+    df_range = df[(df["Date"] >= start) & (df["Date"] <= end)]
+    df_range["Group"] = df_range["Date"].dt.to_period("M").apply(lambda r: r.start_time.strftime("%b"))
+    x_title = "Month"
+else:
+    df_range = df.copy()
+    if (df["Date"].max() - df["Date"].min()).days < 700:
+        df_range["Group"] = df_range["Date"].dt.to_period("M").apply(lambda r: r.start_time.strftime("%b %Y"))
+        x_title = "Month"
+    else:
+        df_range["Group"] = df_range["Date"].dt.to_period("Y").apply(lambda r: r.start_time.strftime("%Y"))
+        x_title = "Year"
+
+total_by = df_range.groupby("Group")["Distance (km)"].sum().reset_index()
+
+chart = alt.Chart(total_by).mark_bar(size=bar_widths[view]).encode(
+    x=alt.X("Group:N", title=x_title),
+    y=alt.Y("Distance (km):Q", title="Distance (km)"),
+    tooltip=["Group", "Distance (km)"]
+).properties(height=400)
+
+st.altair_chart(chart, use_container_width=True)
+
+# Summary Filters
 st.sidebar.subheader("🗓️ Filter by Time Range")
 time_range = st.sidebar.selectbox(
     "Select time range",
@@ -29,15 +119,14 @@ group_by = st.sidebar.selectbox(
     ["Daily", "Weekly", "Monthly", "Yearly"]
 )
 
-# Apply time filter
-now = pd.to_datetime(datetime.now())
+# Time range logic
 range_mapping = {
-    "1 Week": now - timedelta(weeks=1),
-    "1 Month": now - timedelta(weeks=4),
-    "3 Months": now - timedelta(weeks=13),
-    "6 Months": now - timedelta(weeks=26),
-    "1 Year": now - timedelta(weeks=52),
-    "2 Years": now - timedelta(weeks=104),
+    "1 Week": today - timedelta(weeks=1),
+    "1 Month": today - timedelta(weeks=4),
+    "3 Months": today - timedelta(weeks=13),
+    "6 Months": today - timedelta(weeks=26),
+    "1 Year": today - timedelta(weeks=52),
+    "2 Years": today - timedelta(weeks=104),
     "All": pd.to_datetime("2000-01-01")
 }
 cutoff = range_mapping[time_range]
@@ -50,67 +139,7 @@ col1.metric("Total Distance", f"{df_filtered['Distance (km)'].sum():.1f} km")
 col2.metric("Avg Pace", f"{df_filtered['Pace (min/km)'].mean():.2f} min/km")
 col3.metric("Avg Heart Rate", f"{df_filtered['Avg HR'].mean():.0f} bpm")
 
-# Garmin-style total distance chart
-st.subheader("📊 Total Distance")
-distance_view = st.radio(
-    "Select Time Range",
-    ["7 Days", "4 Weeks", "6 Months", "1 Year", "All"],
-    horizontal=True
-)
-
-today = pd.to_datetime("today").normalize()
-
-if distance_view == "7 Days":
-    start = today - pd.Timedelta(days=6)
-    df_range = df[df["Date"] >= start]
-    df_range["Day"] = df_range["Date"].dt.day_name()
-    order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    total_by = df_range.groupby("Day")["Distance (km)"].sum().reindex(order, fill_value=0).reset_index()
-    x_field = "Day"
-    chart_title = "Distance This Week"
-
-elif distance_view == "4 Weeks":
-    start = today - pd.Timedelta(weeks=4)
-    df_range = df[df["Date"] >= start]
-    df_range["Week"] = df_range["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    total_by = df_range.groupby("Week")["Distance (km)"].sum().reset_index()
-    x_field = "Week"
-    chart_title = "Distance (Last 4 Weeks)"
-
-elif distance_view in ["6 Months", "1 Year"]:
-    months_back = 6 if distance_view == "6 Months" else 12
-    start = today - pd.DateOffset(months=months_back)
-    df_range = df[df["Date"] >= start]
-    df_range["Month"] = df_range["Date"].dt.to_period("M").apply(lambda r: r.start_time)
-    total_by = df_range.groupby("Month")["Distance (km)"].sum().reset_index()
-    x_field = "Month"
-    chart_title = f"Distance (Last {months_back} Months)"
-
-else:  # All
-    if (df["Date"].max() - df["Date"].min()).days < 700:
-        df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
-        total_by = df.groupby("Month")["Distance (km)"].sum().reset_index()
-        x_field = "Month"
-        chart_title = "Distance by Month"
-    else:
-        df["Year"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
-        total_by = df.groupby("Year")["Distance (km)"].sum().reset_index()
-        x_field = "Year"
-        chart_title = "Distance by Year"
-
-# ✅ FIXED chart - removed unsupported cornerRadiusTop
-chart = alt.Chart(total_by).mark_bar().encode(
-    x=alt.X(f"{x_field}:T", title=None),
-    y=alt.Y("Distance (km):Q", title="Kilometers"),
-    tooltip=[x_field, "Distance (km)"]
-).properties(
-    height=400,
-    title=chart_title
-)
-
-st.altair_chart(chart, use_container_width=True)
-
-# Aggregation logic for classic distance chart
+# Distance Grouped Chart
 if group_by == "Daily":
     df_filtered["Period"] = df_filtered["Date"].dt.date
 elif group_by == "Weekly":
@@ -123,7 +152,6 @@ else:
 agg_km = df_filtered.groupby("Period")["Distance (km)"].sum().reset_index()
 bar_size = {"Daily": 20, "Weekly": 10, "Monthly": 5, "Yearly": 2}.get(group_by, 10)
 
-# Classic Distance Chart
 st.subheader(f"📊 Total Distance ({group_by}) — {time_range}")
 chart = alt.Chart(agg_km).mark_bar(size=bar_size).encode(
     x=alt.X('Period:T', title=group_by),
@@ -147,7 +175,7 @@ race_day = datetime(2025, 5, 24)
 days_left = (race_day - datetime.today()).days
 st.markdown(f"### 🗓️ {days_left} days left until race day (May 24, 2025)")
 
-# --- Race Training Plan Section ---
+# Race Plan Table
 st.header("Race Training Plan")
 start_week = df['Date'].min().to_period("W").start_time
 end_week = race_day
@@ -178,10 +206,8 @@ edited = st.data_editor(
 )
 st.session_state.plan_df['Planned'] = edited['Planned']
 
-# Plot: Planned vs Actual
 st.subheader("📊 Planned vs Actual Distance per Week")
 melted = pd.melt(merged, id_vars=["Week"], value_vars=["Planned", "Actual"], var_name="Type", value_name="KM")
-
 highlight = alt.Chart(pd.DataFrame({"x": [pd.to_datetime("2025-05-24")]})).mark_rule(color="red").encode(x='x:T')
 
 bar_chart = alt.Chart(melted).mark_bar().encode(
