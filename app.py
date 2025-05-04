@@ -85,7 +85,6 @@ elif view == "1 Year":
     monthly_km = df.groupby("Month")["Distance (km)"].sum().reset_index()
     df_months = pd.DataFrame({"Month": months}).merge(monthly_km, on="Month", how="left").fillna(0)
     df_months["Month Label"] = df_months["Month"].dt.strftime("%b %Y")
-    month_label_order = df_months["Month Label"].tolist()
     df_agg = df_months
     x_field = "Month Label:N"
     x_title = "Month"
@@ -99,7 +98,6 @@ elif view == "All (monthly)":
     monthly_km["Quarter"] = monthly_km["MonthStart"].dt.quarter
     monthly_km["MonthName"] = monthly_km["MonthStart"].dt.strftime("%b")
     monthly_km["MultiLabel"] = monthly_km["Year"].astype(str) + " | Q" + monthly_km["Quarter"].astype(str) + " | " + monthly_km["MonthName"]
-    
     df_agg = monthly_km
     x_field = "MultiLabel:N"
     x_title = "Year | Quarter | Month"
@@ -114,9 +112,12 @@ elif view == "All Yearly":
     bar_width = 30
     x_axis = alt.Axis(title=x_title)
 
+# Extract field name for sorting
+sort_field = x_field.split(":")[0] if x_field.endswith(":N") else None
+
 # Base chart
 base = alt.Chart(df_agg).encode(
-    x=alt.X(x_field, title=x_title, axis=x_axis, sort=df_agg[x_field].tolist() if x_field.endswith(":N") else None),
+    x=alt.X(x_field, title=x_title, axis=x_axis, sort=df_agg[sort_field].tolist() if sort_field else None),
     y=alt.Y("Distance (km):Q", title="Distance (km)"),
     tooltip=[df_agg.columns[0], "Distance (km)"]
 )
