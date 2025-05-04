@@ -32,7 +32,7 @@ chart_style = st.selectbox(
     index=0
 )
 
-# Handle each view
+# View-specific processing
 if view == "Weekly":
     start = today - timedelta(days=today.weekday())
     days = [start + timedelta(days=i) for i in range(7)]
@@ -95,14 +95,26 @@ elif view == "All (monthly)":
     df["MonthStart"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
     monthly_km = df.groupby("MonthStart")["Distance (km)"].sum().reset_index()
     monthly_km["Year"] = monthly_km["MonthStart"].dt.year
-    monthly_km["Quarter"] = monthly_km["MonthStart"].dt.quarter
+    monthly_km["Quarter"] = "Q" + monthly_km["MonthStart"].dt.quarter.astype(str)
     monthly_km["MonthName"] = monthly_km["MonthStart"].dt.strftime("%b")
-    monthly_km["MultiLabel"] = monthly_km["Year"].astype(str) + " | Q" + monthly_km["Quarter"].astype(str) + " | " + monthly_km["MonthName"]
     df_agg = monthly_km
-    x_field = "MultiLabel:N"
-    x_title = "Year | Quarter | Month"
+    x_field = "MonthStart:T"
+    x_title = "Month"
     bar_width = 10
     x_axis = alt.Axis(title=x_title, labelAngle=-45, labelFontSize=10)
+
+    # Extra labels for quarter and year
+    quarter_labels = df_agg.drop_duplicates(subset=["Quarter", "Year"])
+    quarter_labels["Label"] = quarter_labels["Quarter"] + " " + quarter_labels["Year"].astype(str)
+    year_labels = df_agg.drop_duplicates(subset=["Year"])
+    year_labels["Label"] = year_labels["Year"].astype(str)
+
+    quarter_marks = alt.Chart(quarter_labels).mark_text(dy=-180, fontSize=10, fontWeight="bold").encode(
+        x="MonthStart:T", text="Label"
+    )
+    year_marks = alt.Chart(year_labels).mark_text(dy=-200, fontSize=12, fontWeight="bold").encode(
+        x="MonthStart:T", text="Label"
+    )
 
 elif view == "All Yearly":
     df["Year"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
@@ -122,7 +134,7 @@ base = alt.Chart(df_agg).encode(
     tooltip=[df_agg.columns[0], "Distance (km)"]
 )
 
-# Render chart
+# Choose chart style
 if chart_style == "Bar":
     chart = base.mark_bar(size=bar_width)
 elif chart_style == "Bar + Line":
@@ -131,5 +143,9 @@ elif chart_style == "Line + Dots":
     chart = base.mark_line(strokeWidth=2) + base.mark_point(filled=True, size=70)
 elif chart_style == "Area + Dots":
     chart = base.mark_area(opacity=0.5, interpolate="monotone") + base.mark_point(filled=True, size=70)
+
+# If All (monthly), overlay year/quarter marks
+if view == "All (monthly)":
+    chart = chart + quarter_marks + year_marks
 
 st.altair_chart(chart.properties(height=400), use_container_width=True)
