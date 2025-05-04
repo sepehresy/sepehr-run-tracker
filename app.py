@@ -75,18 +75,23 @@ elif view == "6 Months":
     bar_width = 8
 
 elif view == "1 Year":
-    # Generate list from 12 months ago up to current month (inclusive)
+    # Create list of 13 months: from 12 months ago to current month
     months = [(today.replace(day=1) - relativedelta(months=12 - i)) for i in range(13)]
-    
+
     df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
     monthly_km = df.groupby("Month")["Distance (km)"].sum().reindex(months, fill_value=0).reset_index()
     monthly_km.columns = ["Month", "Distance (km)"]
+    
+    # Format month labels and define sort order
     monthly_km["Month Label"] = monthly_km["Month"].dt.strftime("%b %Y")
+    month_label_order = monthly_km["Month Label"].tolist()
 
     df_agg = monthly_km
     x_field = "Month Label:N"
     x_title = "Month"
     bar_width = 20
+    x_axis = alt.Axis(title=x_title, labelAngle=-45, labelFontSize=11, labelColor="#ccc")
+
 
 elif view == "All Months":
     df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
