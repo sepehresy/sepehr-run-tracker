@@ -103,7 +103,6 @@ elif view == "All (monthly)":
     bar_width = 10
     x_axis = alt.Axis(title=x_title, labelAngle=-45, labelFontSize=10)
 
-    # Extra labels for quarter and year
     quarter_labels = df_agg.drop_duplicates(subset=["Quarter", "Year"])
     quarter_labels["Label"] = quarter_labels["Quarter"] + " " + quarter_labels["Year"].astype(str)
     year_labels = df_agg.drop_duplicates(subset=["Year"])
@@ -124,17 +123,14 @@ elif view == "All Yearly":
     bar_width = 30
     x_axis = alt.Axis(title=x_title)
 
-# Extract field name for sorting
 sort_field = x_field.split(":")[0] if x_field.endswith(":N") else None
 
-# Base chart
 base = alt.Chart(df_agg).encode(
     x=alt.X(x_field, title=x_title, axis=x_axis, sort=df_agg[sort_field].tolist() if sort_field else None),
     y=alt.Y("Distance (km):Q", title="Distance (km)"),
     tooltip=[df_agg.columns[0], "Distance (km)"]
 )
 
-# Choose chart style
 if chart_style == "Bar":
     chart = base.mark_bar(size=bar_width)
 elif chart_style == "Bar + Line":
@@ -144,9 +140,7 @@ elif chart_style == "Line + Dots":
 elif chart_style == "Area + Dots":
     chart = base.mark_area(opacity=0.5, interpolate="monotone") + base.mark_point(filled=True, size=70)
 
-# If All (monthly), overlay year/quarter marks
 if view == "All (monthly)":
     chart = chart + quarter_marks + year_marks
 
-# Final chart
 st.altair_chart(chart.properties(height=400), use_container_width=True)
