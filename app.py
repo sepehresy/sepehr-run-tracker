@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 st.set_page_config(page_title="Running Dashboard", layout="wide")
-st.title("\ud83c\udfc3 Summary Statistics")
+st.title("🏃 Summary Statistics")
 
 # Load data
 sheet_url = st.secrets["gsheet_url"]
