@@ -45,14 +45,12 @@ def render_activities(df):
 
                 lap_df = pd.DataFrame(lap_data)
                 if not lap_df.empty:
-                    lap_df["Label"] = lap_df["Distance"].astype(int).astype(str)
-
                     fig, ax = plt.subplots(figsize=(10, 0.4 * len(lap_df)))
                     bars = ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
 
                     for i, row in lap_df.iterrows():
-                        ax.text(0, i, f"{row['Distance']:.0f}", va='center', ha='left', fontweight='bold')
-                        ax.text(0.7, i, f"{row['Time']}", va='center', ha='left')
+                        ax.text(-0.2, i, f"{row['Distance']:.2f}", va='center', ha='right', fontweight='bold')
+                        ax.text(0, i, f"{row['Time']}", va='center', ha='left')
                         ax.text(row["Pace"] + 0.1, i, f"{row['ElevGain']:.0f} | {row['HR']}", va='center', ha='left')
 
                     ax.set_yticks(lap_df.index)
