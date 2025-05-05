@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import re
 
 def render_activities(df):
     st.title("📋 Activities")
@@ -13,22 +14,15 @@ def render_activities(df):
             if pd.notna(row["Lap Details"]):
                 st.markdown(f"**{row['Date'].date()} - {row['Name']}**")
                 try:
-                    laps_raw = row["Lap Details"].split("Lap ")
+                    laps_raw = re.findall(r"Lap (\d+): ([^\n]+)", row["Lap Details"])
                     lap_data = []
-                    for lap in laps_raw:
-                        if lap.strip():
-                            lap_lines = lap.strip().split(",")
-                            lap_info = {}
-                            for item in lap_lines:
-                                if ":" in item:
-                                    key, val = item.split(":", 1)
-                                    lap_info[key.strip()] = val.strip()
-                            if 'Lap' in lap_info:
-                                lap_number = lap_info.pop('Lap')
-                            else:
-                                lap_number = lap.strip().split()[0].replace(":", "")
-                            lap_info["Lap"] = int(lap_number)
-                            lap_data.append(lap_info)
+                    for lap_number, details in laps_raw:
+                        lap_info = {"Lap": int(lap_number)}
+                        for item in details.split(","):
+                            if ":" in item:
+                                key, val = item.split(":", 1)
+                                lap_info[key.strip()] = val.strip()
+                        lap_data.append(lap_info)
 
                     lap_df = pd.DataFrame(lap_data)
                     if not lap_df.empty:
