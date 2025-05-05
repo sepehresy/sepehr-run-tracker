@@ -66,15 +66,13 @@ elif view in ["3 Months", "6 Months"]:
     weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
     df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
     df_agg["WeekStart"] = df_agg["Week"]
-    df_agg["Month"] = df_agg["Week"].dt.month
-
-    # Month dividers when month changes
+    df_agg = df_agg.sort_values("WeekStart")
+    df_agg["Month"] = df_agg["WeekStart"].dt.month
     df_agg["Prev Month"] = df_agg["Month"].shift(1)
     divider_dates = df_agg[df_agg["Month"] != df_agg["Prev Month"]]["WeekStart"]
     month_lines = alt.Chart(pd.DataFrame({"x": divider_dates})).mark_rule(
         strokeDash=[4, 4], color="gray"
     ).encode(x="x:T")
-
     x_field = "WeekStart:T"
     x_title = "Week"
     bar_width = 8 if view == "6 Months" else 10
@@ -100,8 +98,6 @@ elif view == "All (monthly)":
     x_title = "Month"
     bar_width = 10
     x_axis = alt.Axis(title=x_title, labelAngle=-45, labelFontSize=10)
-
-    # Year divider rule lines
     year_lines = alt.Chart(df_agg[df_agg["MonthStart"].dt.month == 1]).mark_rule(
         strokeDash=[4, 4], color="gray"
     ).encode(x="MonthStart:T")
