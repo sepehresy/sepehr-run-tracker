@@ -3,9 +3,8 @@ import pandas as pd
 import re
 import matplotlib.pyplot as plt
 from openai import OpenAI
-import os
 
-client = OpenAI(api_key=st.secrets("OPENAI_API_KEY"))
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 def render_activities(df):
     st.title("📋 Activities")
