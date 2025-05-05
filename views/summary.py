@@ -108,10 +108,15 @@ def render_summary(df, today):
 
     sort_field = x_field.split(":")[0] if x_field.endswith(":N") else None
 
+    if view_option == "Weekly":
+        tooltip_fields = ["Day", "Distance (km)", "Pace (min/km)", "Avg HR", "Cadence", "Elevation Gain"]
+    else:
+        tooltip_fields = [df_agg.columns[0], "Distance (km)"]
+
     base = alt.Chart(df_agg).encode(
         x=alt.X(x_field, title=x_title, axis=x_axis, sort=df_agg[sort_field].tolist() if sort_field else None),
         y=alt.Y("Distance (km):Q", title="Distance (km)"),
-        tooltip=[df_agg.columns[0], "Distance (km)", "Pace (min/km)", "Avg HR", "Cadence", "Elevation Gain"]
+        tooltip=tooltip_fields
     )
 
     if chart_style == "Bar":
