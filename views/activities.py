@@ -17,9 +17,9 @@ def render_activities(df):
                     lap_data = []
                     for lap in laps_raw:
                         if lap.strip():
-                            lap_number = lap.strip().split("km")[0].strip().replace(":", "")
+                            lap_number = lap.strip().split()[0].replace(":", "")
                             parts = [p.strip() for p in lap.strip().split(",") if ":" in p]
-                            lap_info = {"Lap": lap_number}
+                            lap_info = {"Lap": int(lap_number)}
                             for kv in parts:
                                 k, v = kv.split(":", 1)
                                 lap_info[k.strip()] = v.strip()
