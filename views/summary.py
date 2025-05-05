@@ -132,20 +132,20 @@ def render_summary(df, today):
         chart = chart + year_lines
 
     if view_option == "Weekly":
-        for field, label in zip([
+        for i, (field, label) in enumerate(zip([
             "Pace (min/km)", "Avg HR", "Cadence", "Elevation Gain"
-        ], ["Pace", "HR", "Cad", "Elev"]):
+        ], ["Pace", "HR", "Cad", "Elev"])):
             annotation = alt.Chart(df_agg).mark_text(
                 color="white",
                 align="center",
                 baseline="bottom",
-                dy=-5,
+                dy=-15 * (i + 1),
                 fontSize=11
             ).encode(
                 x=alt.X(x_field, sort=df_agg["Day"].tolist()),
                 y=alt.Y("Distance (km):Q"),
                 text=alt.Text(f"{field}:Q", format=".0f")
-            ).properties(title=label)
+            )
             chart += annotation
 
     st.altair_chart(chart.properties(height=400), use_container_width=True)
