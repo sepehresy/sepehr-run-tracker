@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 def render_summary(df, today):
-    st.title("🏃 Summary Statistics (v1.0.0)")
+    st.title("🏃 Summary Statistics (v2.0.0)")
 
     view_option = st.radio(
         "Select View",
