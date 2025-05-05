@@ -106,7 +106,8 @@ def render_activities(df):
                     )
                     with st.spinner("Thinking..."):
                         response = client.chat.completions.create(
-                            model="gpt-4",
+                            # model="gpt-4",
+                            model="gpt-3.5-turbo",
                             messages=[
                                 {"role": "system", "content": "You are a professional running coach."},
                                 {"role": "user", "content": prompt}
