@@ -40,30 +40,21 @@ def render_activities(df):
                     if not lap_df.empty:
                         lap_df = lap_df.sort_values("KM")
 
-                        st.dataframe(lap_df.set_index("KM"))
-
-                        chart_data = lap_df.copy()
-                        chart_data["Pace_min"] = chart_data["Pace"]
-
-                        bars = alt.Chart(chart_data).mark_bar(color="#00BFFF").encode(
-                            x=alt.X("KM:O", title="KM"),
-                            y=alt.Y("Pace_min:Q", title="Pace (min/km)"),
-                            tooltip=["KM", "Time", "Pace", "HR", "Elev"]
+                        st.altair_chart(
+                            alt.Chart(lap_df)
+                            .mark_bar(color="#00BFFF")
+                            .encode(
+                                x=alt.X("KM:O", title="KM"),
+                                y=alt.Y("Pace:Q", title="Pace (min/km)"),
+                                tooltip=["KM", "Time", "Pace", "HR", "Elev"]
+                            ).properties(height=300),
+                            use_container_width=True
                         )
 
-                        pace_labels = alt.Chart(chart_data).mark_text(
-                            align="left",
-                            baseline="middle",
-                            dx=5,
-                            color="black",
-                            fontSize=12
-                        ).encode(
-                            x=alt.X("KM:O"),
-                            y=alt.Y("Pace_min:Q"),
-                            text=alt.Text("Pace_min:Q", format=".2f")
+                        st.dataframe(
+                            lap_df[["KM", "Time", "Pace", "Elev", "HR"]].set_index("KM"),
+                            use_container_width=True
                         )
-
-                        st.altair_chart((bars + pace_labels).properties(height=400), use_container_width=True)
 
                 except Exception as e:
                     st.warning(f"Could not parse lap details: {e}")
