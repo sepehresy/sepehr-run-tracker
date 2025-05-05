@@ -131,7 +131,7 @@ def render_summary(df, today):
     if view_option == "All (monthly)":
         chart = chart + year_lines
 
-        if view_option == "Weekly":
+    if view_option == "Weekly":
         annotation = alt.Chart(df_agg).mark_text(
             align="center",
             baseline="bottom",
