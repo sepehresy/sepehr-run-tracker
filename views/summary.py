@@ -26,6 +26,7 @@ def render_summary(df, today):
         daily_km = df[df["Date"].between(start, start + timedelta(days=6))].groupby("Day")["Distance (km)"].sum()
         df_agg = pd.DataFrame({"Day": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]})
         df_agg["Distance (km)"] = df_agg["Day"].map(daily_km).fillna(0)
+        df_agg = df_agg[df_agg["Distance (km)"] > 0]  # filter only shown bars
         x_field = "Day:N"
         x_title = "Day"
         bar_width = 60
@@ -44,7 +45,7 @@ def render_summary(df, today):
         x_field = "WeekStart:T"
         x_title = "Week"
         bar_width = 40
-        x_axis = alt.Axis(title=x_title, format="%b-%d", labelOverlap=False)
+        x_axis = alt.Axis(title=x_title, format="%b-%d", labelOverlap=False, labelExpr='format(datum.value, "%b-%d")')
 
     elif view_option in ["3 Months", "6 Months"]:
         months_back = 3 if view_option == "3 Months" else 6
