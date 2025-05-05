@@ -52,7 +52,8 @@ elif view == "4 Weeks":
     df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
     weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
     df_agg = pd.DataFrame({"Week": weeks}).merge(weekly_km, on="Week", how="left").fillna(0)
-    x_field = "Week:T"
+    df_agg["Week Label"] = df_agg["Week"].dt.strftime("%b-%d")
+    x_field = "Week Label:N"
     x_title = "Week"
     bar_width = 40
     x_axis = alt.Axis(title=x_title)
@@ -63,7 +64,8 @@ elif view == "3 Months":
     df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
     weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
     df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
-    x_field = "Week:T"
+    df_agg["Week Label"] = df_agg["Week"].dt.strftime("%b-%d")
+    x_field = "Week Label:N"
     x_title = "Week"
     bar_width = 10
     x_axis = alt.Axis(title=x_title)
@@ -74,7 +76,8 @@ elif view == "6 Months":
     df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
     weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
     df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
-    x_field = "Week:T"
+    df_agg["Week Label"] = df_agg["Week"].dt.strftime("%b-%d")
+    x_field = "Week Label:N"
     x_title = "Week"
     bar_width = 8
     x_axis = alt.Axis(title=x_title)
