@@ -21,16 +21,15 @@ def render_summary(df, today):
 
     if view_option == "Weekly":
         start = today - timedelta(days=today.weekday())
-        days = [start + timedelta(days=i) for i in range(7)]
-        df["Day"] = df["Date"].dt.strftime("%a")
-        daily_km = df[df["Date"].between(start, start + timedelta(days=6))].groupby("Day")["Distance (km)"].sum()
-        df_agg = pd.DataFrame({"Day": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]})
-        df_agg["Distance (km)"] = df_agg["Day"].map(daily_km).fillna(0)
-        df_agg = df_agg[df_agg["Distance (km)"] > 0]  # filter only shown bars
-        x_field = "Day:N"
-        x_title = "Day"
+        df["Week"] = df["Date"] - pd.to_timedelta(df["Date"].dt.weekday, unit='d')
+        df["Week"] = df["Week"].dt.normalize()
+        weekly_km = df[df["Week"] == start].groupby("Week")["Distance (km)"].sum().reset_index()
+        df_agg = weekly_km[weekly_km["Distance (km)"] > 0]
+        df_agg["WeekStart"] = df_agg["Week"]
+        x_field = "WeekStart:T"
+        x_title = "Week"
         bar_width = 60
-        x_axis = alt.Axis(title=x_title)
+        x_axis = alt.Axis(title=x_title, format="%b-%d")
 
     elif view_option == "4 Weeks":
         current_week_start = today - timedelta(days=today.weekday())
@@ -41,11 +40,11 @@ def render_summary(df, today):
         weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
         df_agg = pd.DataFrame({"Week": weeks}).merge(weekly_km, on="Week", how="left").fillna(0)
         df_agg["WeekStart"] = df_agg["Week"]
-        df_agg = df_agg[df_agg["Distance (km)"] > 0]  # filter only shown bars
+        df_agg = df_agg[df_agg["Distance (km)"] > 0]
         x_field = "WeekStart:T"
         x_title = "Week"
         bar_width = 40
-        x_axis = alt.Axis(title=x_title, format="%b-%d", labelOverlap=False, )
+        x_axis = alt.Axis(title=x_title, format="%b-%d", labelOverlap=False)
 
     elif view_option in ["3 Months", "6 Months"]:
         months_back = 3 if view_option == "3 Months" else 6
@@ -54,7 +53,7 @@ def render_summary(df, today):
         df["Week"] = df["Week"].dt.normalize()
         weekly_km = df[df["Week"] >= start].groupby("Week")["Distance (km)"].sum().reset_index()
         df_agg = weekly_km.copy()
-        df_agg = df_agg[df_agg["Distance (km)"] > 0]  # filter only shown bars
+        df_agg = df_agg[df_agg["Distance (km)"] > 0]
         df_agg["WeekStart"] = df_agg["Week"]
         df_agg = df_agg.sort_values("WeekStart")
         x_field = "WeekStart:T"
