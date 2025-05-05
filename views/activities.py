@@ -12,7 +12,7 @@ def render_activities(df):
         for _, row in df.sort_values("Date", ascending=False).iterrows():
             if pd.notna(row["Lap Details"]):
                 st.markdown(f"**{row['Date'].date()} - {row['Name']}**")
-                                try:
+                try:
                     laps_raw = row["Lap Details"].split("Lap ")
                     lap_data = []
                     for lap in laps_raw:
