@@ -21,13 +21,13 @@ def render_summary(df, today):
 
     if view_option == "Weekly":
         start = today - timedelta(days=today.weekday())
-        df["Week"] = df["Date"].dt.isocalendar().week
-        weekly_km = df[df["Date"] >= start].groupby("Week")["Distance (km)"].sum().reset_index()
-        weekly_km = weekly_km[weekly_km["Distance (km)"] > 0]
-        weekly_km["WeekLabel"] = "Week-" + weekly_km["Week"].astype(str)
-        df_agg = weekly_km
-        x_field = "WeekLabel:N"
-        x_title = "Week #"
+        end = start + timedelta(days=6)
+        df_week = df[(df["Date"] >= start) & (df["Date"] <= end)].copy()
+        df_week["Day"] = df_week["Date"].dt.strftime("%a")
+        daily_km = df_week.groupby("Day")["Distance (km)"].sum().reindex(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]).fillna(0).reset_index()
+        df_agg = daily_km
+        x_field = "Day:N"
+        x_title = "Day"
         bar_width = 60
         x_axis = alt.Axis(title=x_title)
 
