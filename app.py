@@ -159,3 +159,28 @@ if st.button("🔍 Analyze My Runs with AI"):
 
     st.markdown("---")
     st.markdown("_This AI summary is based on your last 8 weeks of training and updates as new runs are added._")
+
+# --- Activity Viewer ---
+st.subheader("📂 Activities")
+activity_log = df.sort_values("Date", ascending=False)
+selected = st.selectbox("Select a Run", activity_log["Date"].dt.strftime("%Y-%m-%d").tolist())
+selected_run = activity_log[activity_log["Date"].dt.strftime("%Y-%m-%d") == selected].iloc[0]
+
+# Placeholder for splits — demo only
+splits = pd.DataFrame({
+    "KM": list(range(1, 9)),
+    "Pace": ["5:53", "5:55", "5:36", "6:00", "6:09", "5:45", "6:09", "5:47"],
+    "Elev": [8, 1, -1, -2, 8, -4, -1, 0],
+    "HR": [122, 133, 178, 173, 172, 178, 178, 181]
+})
+
+st.markdown("**Split Analysis**")
+st.dataframe(splits, use_container_width=True)
+
+st.markdown("**Summary Stats**")
+st.metric("Distance", "42.80 km")
+st.metric("Avg Pace", "5:36 /km")
+st.metric("Moving Time", "3:59:28")
+st.metric("Elevation Gain", "153 m")
+st.metric("Avg Power", "293 W")
+st.metric("Calories", "3,005 Cal")
