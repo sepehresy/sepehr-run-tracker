@@ -40,10 +40,11 @@ def render_summary(df, today):
         weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
         df_agg = pd.DataFrame({"Week": weeks}).merge(weekly_km, on="Week", how="left").fillna(0)
         df_agg["WeekStart"] = df_agg["Week"]
+        df_agg = df_agg[df_agg["Distance (km)"] > 0]  # filter only shown bars
         x_field = "WeekStart:T"
         x_title = "Week"
         bar_width = 40
-        x_axis = alt.Axis(title=x_title, format="%b-%d")
+        x_axis = alt.Axis(title=x_title, format="%b-%d", labelOverlap=False)
 
     elif view_option in ["3 Months", "6 Months"]:
         months_back = 3 if view_option == "3 Months" else 6
@@ -52,6 +53,7 @@ def render_summary(df, today):
         df["Week"] = df["Week"].dt.normalize()
         weekly_km = df[df["Week"] >= start].groupby("Week")["Distance (km)"].sum().reset_index()
         df_agg = weekly_km.copy()
+        df_agg = df_agg[df_agg["Distance (km)"] > 0]  # filter only shown bars
         df_agg["WeekStart"] = df_agg["Week"]
         df_agg = df_agg.sort_values("WeekStart")
         x_field = "WeekStart:T"
@@ -64,6 +66,7 @@ def render_summary(df, today):
         df["Month"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
         monthly_km = df.groupby("Month")["Distance (km)"].sum().reset_index()
         df_months = pd.DataFrame({"Month": months}).merge(monthly_km, on="Month", how="left").fillna(0)
+        df_months = df_months[df_months["Distance (km)"] > 0]
         df_months["Month Label"] = df_months["Month"].dt.strftime("%b %Y")
         df_agg = df_months
         x_field = "Month Label:N"
@@ -74,7 +77,7 @@ def render_summary(df, today):
     elif view_option == "All (monthly)":
         df["MonthStart"] = df["Date"].dt.to_period("M").apply(lambda r: r.start_time)
         monthly_km = df.groupby("MonthStart")["Distance (km)"].sum().reset_index()
-        df_agg = monthly_km
+        df_agg = monthly_km[monthly_km["Distance (km)"] > 0]
         x_field = "MonthStart:T"
         x_title = "Month"
         bar_width = 10
@@ -86,7 +89,7 @@ def render_summary(df, today):
     elif view_option == "All Yearly":
         df["YearStart"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
         yearly_km = df.groupby("YearStart")["Distance (km)"].sum().reset_index()
-        df_agg = yearly_km
+        df_agg = yearly_km[yearly_km["Distance (km)"] > 0]
         x_field = "YearStart:T"
         x_title = "Year"
         bar_width = 40
