@@ -49,35 +49,30 @@ elif view == "4 Weeks":
     current_week_start = today - timedelta(days=today.weekday())
     start = current_week_start - timedelta(weeks=4)
     weeks = [start + timedelta(weeks=i) for i in range(5)]
-    df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
+    df["Week"] = df["Date"] - pd.to_timedelta(df["Date"].dt.weekday, unit='d')
+    df["Week"] = df["Week"].dt.normalize()
     weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
     df_agg = pd.DataFrame({"Week": weeks}).merge(weekly_km, on="Week", how="left").fillna(0)
-    x_field = "Week:T"
+    df_agg["WeekStart"] = df_agg["Week"]
+    x_field = "WeekStart:T"
     x_title = "Week"
     bar_width = 40
-    x_axis = alt.Axis(title=x_title)
+    x_axis = alt.Axis(title=x_title, format="%b-%d")
 
-elif view == "3 Months":
-    start = today - relativedelta(months=3)
-    week_range = pd.date_range(start=start, end=today, freq="W-MON")
-    df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
-    df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
-    x_field = "Week:T"
+elif view in ["3 Months", "6 Months"]:
+    months_back = 3 if view == "3 Months" else 6
+    start = today - relativedelta(months=months_back)
+    df["Week"] = df["Date"] - pd.to_timedelta(df["Date"].dt.weekday, unit='d')
+    df["Week"] = df["Week"].dt.normalize()
+    weekly_km = df[df["Week"] >= start].groupby("Week")["Distance (km)"].sum().reset_index()
+    df_agg = weekly_km.copy()
+    df_agg = df_agg[df_agg["Week"] == df_agg["Week"]]  # Filter valid weeks
+    df_agg["WeekStart"] = df_agg["Week"]
+    df_agg = df_agg.sort_values("WeekStart")
+    x_field = "WeekStart:T"
     x_title = "Week"
-    bar_width = 10
-    x_axis = alt.Axis(title=x_title)
-
-elif view == "6 Months":
-    start = today - relativedelta(months=6)
-    week_range = pd.date_range(start=start, end=today, freq="W-MON")
-    df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
-    df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
-    x_field = "Week:T"
-    x_title = "Week"
-    bar_width = 8
-    x_axis = alt.Axis(title=x_title)
+    bar_width = 20
+    x_axis = alt.Axis(title=x_title, format="%b-%d", labelAngle=-45, labelFontSize=10)
 
 elif view == "1 Year":
     months = [(today.replace(day=1) - relativedelta(months=12 - i)) for i in range(13)]
@@ -99,19 +94,18 @@ elif view == "All (monthly)":
     x_title = "Month"
     bar_width = 10
     x_axis = alt.Axis(title=x_title, labelAngle=-45, labelFontSize=10)
-
-    # Year divider rule lines
     year_lines = alt.Chart(df_agg[df_agg["MonthStart"].dt.month == 1]).mark_rule(
         strokeDash=[4, 4], color="gray"
     ).encode(x="MonthStart:T")
 
 elif view == "All Yearly":
-    df["Year"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
-    df_agg = df.groupby("Year")["Distance (km)"].sum().reset_index()
-    x_field = "Year:T"
+    df["YearStart"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
+    yearly_km = df.groupby("YearStart")["Distance (km)"].sum().reset_index()
+    df_agg = yearly_km
+    x_field = "YearStart:T"
     x_title = "Year"
-    bar_width = 30
-    x_axis = alt.Axis(title=x_title)
+    bar_width = 40
+    x_axis = alt.Axis(title=x_title, labelAngle=0, labelFontSize=12)
 
 sort_field = x_field.split(":")[0] if x_field.endswith(":N") else None
 
@@ -134,3 +128,34 @@ if view == "All (monthly)":
     chart = chart + year_lines
 
 st.altair_chart(chart.properties(height=400), use_container_width=True)
+
+# --- AI Run Analysis Section ---
+if st.button("🔍 Analyze My Runs with AI"):
+    last_8_weeks = today - timedelta(weeks=8)
+    recent_runs = df[df["Date"] >= last_8_weeks]
+    total_distance = recent_runs["Distance (km)"].sum()
+    avg_weekly_km = total_distance / 8
+    long_runs = recent_runs[recent_runs["Distance (km)"] > 15]
+    num_runs = recent_runs.shape[0]
+
+    st.subheader("🧠 AI Training Summary")
+    st.markdown(f"You’ve completed **{num_runs} runs** over the past 8 weeks, averaging **{avg_weekly_km:.1f} km/week**.")
+
+    if avg_weekly_km > 60:
+        intensity_note = "Your current volume is solid and indicates strong endurance preparation."
+    elif avg_weekly_km > 40:
+        intensity_note = "You're maintaining a good base. With minor tweaks, you can peak for performance."
+    else:
+        intensity_note = "Your weekly mileage is a bit low for peak performance. A gradual build-up could be beneficial."
+
+    st.write(intensity_note)
+
+    if len(long_runs) >= 6:
+        st.success("✅ Excellent long run consistency — you're well-prepared for endurance events.")
+    elif len(long_runs) >= 3:
+        st.info("⚠️ You've had a few good long runs. Make sure to increase frequency to improve endurance.")
+    else:
+        st.warning("🔻 Not many long runs in your recent training. Consider incorporating longer sessions weekly.")
+
+    st.markdown("---")
+    st.markdown("_This AI summary is based on your last 8 weeks of training and updates as new runs are added._")
