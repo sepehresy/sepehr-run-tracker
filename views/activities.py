@@ -40,14 +40,28 @@ def render_activities(df):
                     if not lap_df.empty:
                         lap_df = lap_df.sort_values("KM")
 
+                        # Create base bar chart for pace
+                        pace_chart = alt.Chart(lap_df).mark_bar(color="#00BFFF").encode(
+                            x=alt.X("KM:O", title="KM"),
+                            y=alt.Y("Pace:Q", title="Pace (min/km)"),
+                            tooltip=["KM", "Time", "Pace", "HR", "Elev"]
+                        )
+
+                        # Add HR and Elev text annotations
+                        text_chart = alt.Chart(lap_df).mark_text(align='left', dx=3, dy=5, color='white').encode(
+                            x=alt.X("KM:O"),
+                            y=alt.Y("Pace:Q"),
+                            text=alt.Text("HR:N", format="d")
+                        )
+
+                        elev_chart = alt.Chart(lap_df).mark_text(align='left', dx=3, dy=-15, color='white').encode(
+                            x=alt.X("KM:O"),
+                            y=alt.Y("Pace:Q"),
+                            text=alt.Text("Elev:N")
+                        )
+
                         st.altair_chart(
-                            alt.Chart(lap_df)
-                            .mark_bar(color="#00BFFF")
-                            .encode(
-                                x=alt.X("KM:O", title="KM"),
-                                y=alt.Y("Pace:Q", title="Pace (min/km)"),
-                                tooltip=["KM", "Time", "Pace", "HR", "Elev"]
-                            ).properties(height=300),
+                            (pace_chart + text_chart + elev_chart).properties(height=300),
                             use_container_width=True
                         )
 
