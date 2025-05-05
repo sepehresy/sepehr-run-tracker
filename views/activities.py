@@ -50,6 +50,11 @@ def render_activities(df):
                     # Plot bars
                     bars = ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
 
+                    # Add vertical line for average pace
+                    avg_pace = lap_df["Pace"].mean()
+                    ax.axvline(x=avg_pace, color="red", linestyle="--", linewidth=1, label=f"Avg Pace: {avg_pace:.2f}")
+                    ax.legend(loc="lower right")
+
                     # Add headers
                     ax.text(-5.8, -1, "KM", fontweight='bold')
                     ax.text(-4.8, -1, "Time", fontweight='bold')
