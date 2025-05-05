@@ -3,6 +3,31 @@ import pandas as pd
 import re
 import matplotlib.pyplot as plt
 from openai import OpenAI
+import json
+import os
+
+# Create analyses directory if it doesn't exist
+os.makedirs("data/analyses", exist_ok=True)
+
+# Function to load saved analyses
+def load_saved_analyses():
+    try:
+        with open("data/analyses/saved_analyses.json", "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+# Function to save analyses
+def save_analysis(key, content):
+    try:
+        analyses = load_saved_analyses()
+        analyses[key] = content
+        with open("data/analyses/saved_analyses.json", "w") as f:
+            json.dump(analyses, f)
+        return True
+    except Exception as e:
+        st.error(f"Error saving analysis: {e}")
+        return False
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
@@ -99,22 +124,68 @@ def render_activities(df):
                     st.pyplot(fig)
 
                     st.subheader("🧠 AI Analysis of This Run")
-                    prompt = (
-                        "Analyze this running activity based on the following per-lap data.\n"
-                        "Comment on pacing, heart rate, cadence, and elevation gain.\n"
-                        f"\nLap Data:\n{lap_df.to_csv(index=False)}"
-                    )
-                    with st.spinner("Thinking..."):
-                        response = client.chat.completions.create(
-                            # model="gpt-4",
-                            model="gpt-3.5-turbo",
-                            messages=[
-                                {"role": "system", "content": "You are a professional running coach."},
-                                {"role": "user", "content": prompt}
-                            ]
-                        )
-                        st.success("Here's your AI feedback:")
-                        st.write(response.choices[0].message.content)
+                    
+                    # Create a unique key for this activity
+                    activity_key = f"analysis_{selected_activity}"
+                    
+                    # Load saved analyses
+                    saved_analyses = load_saved_analyses()
+                    
+                    # Create columns for analysis actions
+                    col1, col2 = st.columns([1, 4])
+                    
+                    with col1:
+                        # Add button to trigger AI analysis
+                        if st.button("Generate Analysis", key=f"button_{activity_key}"):
+                            prompt = (
+                                "Analyze this running activity based on the following per-lap data.\n"
+                                "Comment on pacing strategy, consistency, heart rate trends, and elevation impact.\n"
+                                "Provide specific, actionable feedback for improvement.\n"
+                                f"\nLap Data:\n{lap_df.to_csv(index=False)}\n"
+                                f"\nRun Summary: {selected_row['Distance (km)']}km, "
+                                f"Avg Pace: {format_pace(selected_row['Pace (min/km)'])}, "
+                                f"Avg HR: {selected_row['Avg HR']}, "
+                                f"Elevation Gain: {selected_row['Elevation Gain']}m"
+                            )
+                            with st.spinner("Analyzing your run data..."):
+                                try:
+                                    response = client.chat.completions.create(
+                                        # model="gpt-4",
+                                        model="gpt-3.5-turbo",
+                                        messages=[
+                                            {"role": "system", "content": "You are a professional running coach with expertise in analyzing running data. Provide specific insights and actionable advice."},
+                                            {"role": "user", "content": prompt}
+                                        ]
+                                    )
+                                    # Store in session state AND save to file
+                                    analysis_content = response.choices[0].message.content
+                                    st.session_state[activity_key] = analysis_content
+                                    save_success = save_analysis(activity_key, analysis_content)
+                                    if save_success:
+                                        st.success("Analysis complete!")
+                                except Exception as e:
+                                    st.error(f"Error generating analysis: {e}")
+                    
+                    with col2:
+                        # Button to delete analysis if it exists
+                        if activity_key in saved_analyses or activity_key in st.session_state:
+                            if st.button("Delete Analysis", key=f"delete_{activity_key}"):
+                                if activity_key in st.session_state:
+                                    del st.session_state[activity_key]
+                                if activity_key in saved_analyses:
+                                    saved_analyses.pop(activity_key)
+                                    with open("data/analyses/saved_analyses.json", "w") as f:
+                                        json.dump(saved_analyses, f)
+                                    st.experimental_rerun()
+                    
+                    # Display analysis if it exists in session state OR in saved analyses
+                    if activity_key in st.session_state:
+                        st.write(st.session_state[activity_key])
+                    elif activity_key in saved_analyses:
+                        st.session_state[activity_key] = saved_analyses[activity_key]  # Load into session state
+                        st.write(saved_analyses[activity_key])
+                    else:
+                        st.info("Click 'Generate Analysis' for AI insights on this run")
 
             except Exception as e:
                 st.warning(f"Could not parse lap details: {e}")
