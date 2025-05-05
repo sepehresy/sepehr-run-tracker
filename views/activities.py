@@ -100,22 +100,21 @@ def render_activities(df):
                     st.pyplot(fig)
 
                     st.subheader("🧠 AI Analysis of This Run")
-                    if st.button("Generate AI Analysis"):
-                        prompt = (
-                            "Analyze this running activity based on the following per-lap data.\n"
-                            "Comment on pacing, heart rate, cadence, and elevation gain.\n"
-                            f"\nLap Data:\n{lap_df.to_csv(index=False)}"
+                    prompt = (
+                        "Analyze this running activity based on the following per-lap data.\n"
+                        "Comment on pacing, heart rate, cadence, and elevation gain.\n"
+                        f"\nLap Data:\n{lap_df.to_csv(index=False)}"
+                    )
+                    with st.spinner("Thinking..."):
+                        response = openai.ChatCompletion.create(
+                            model="gpt-4",
+                            messages=[
+                                {"role": "system", "content": "You are a professional running coach."},
+                                {"role": "user", "content": prompt}
+                            ]
                         )
-                        with st.spinner("Thinking..."):
-                            response = openai.ChatCompletion.create(
-                                model="gpt-4",
-                                messages=[
-                                    {"role": "system", "content": "You are a professional running coach."},
-                                    {"role": "user", "content": prompt}
-                                ]
-                            )
-                            st.success("Here's your AI feedback:")
-                            st.write(response["choices"][0]["message"]["content"])
+                        st.success("Here's your AI feedback:")
+                        st.write(response["choices"][0]["message"]["content"])
 
             except Exception as e:
                 st.warning(f"Could not parse lap details: {e}")
