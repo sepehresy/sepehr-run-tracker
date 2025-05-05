@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 st.set_page_config(page_title="Running Dashboard", layout="wide")
-st.title("🏃 Summary Statistics (v1.0.0)")
+st.title("🏃 Summary Statistics (v1.0.1)")
 
 # Load data
 sheet_url = st.secrets["gsheet_url"]
@@ -106,12 +106,13 @@ elif view == "All (monthly)":
     ).encode(x="MonthStart:T")
 
 elif view == "All Yearly":
-    df["Year"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
-    df_agg = df.groupby("Year")["Distance (km)"].sum().reset_index()
-    x_field = "Year:T"
+    df["YearStart"] = df["Date"].dt.to_period("Y").apply(lambda r: r.start_time)
+    yearly_km = df.groupby("YearStart")["Distance (km)"].sum().reset_index()
+    df_agg = yearly_km
+    x_field = "YearStart:T"
     x_title = "Year"
-    bar_width = 30
-    x_axis = alt.Axis(title=x_title)
+    bar_width = 40
+    x_axis = alt.Axis(title=x_title, labelAngle=0, labelFontSize=12)
 
 sort_field = x_field.split(":")[0] if x_field.endswith(":N") else None
 
