@@ -49,7 +49,8 @@ elif view == "4 Weeks":
     current_week_start = today - timedelta(days=today.weekday())
     start = current_week_start - timedelta(weeks=4)
     weeks = [start + timedelta(weeks=i) for i in range(5)]
-    df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
+    df["Week"] = df["Date"] - pd.to_timedelta(df["Date"].dt.weekday, unit='d')
+    df["Week"] = df["Week"].dt.normalize()
     weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
     df_agg = pd.DataFrame({"Week": weeks}).merge(weekly_km, on="Week", how="left").fillna(0)
     df_agg["WeekStart"] = df_agg["Week"]
@@ -62,7 +63,8 @@ elif view in ["3 Months", "6 Months"]:
     months_back = 3 if view == "3 Months" else 6
     start = today - relativedelta(months=months_back)
     week_range = pd.date_range(start=start, end=today, freq="W-MON")
-    df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
+    df["Week"] = df["Date"] - pd.to_timedelta(df["Date"].dt.weekday, unit='d')
+    df["Week"] = df["Week"].dt.normalize()
     weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
     df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
     df_agg["WeekStart"] = df_agg["Week"]
