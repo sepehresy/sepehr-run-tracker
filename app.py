@@ -133,4 +133,8 @@ elif chart_style == "Area + Dots":
     chart = base.mark_area(opacity=0.5, interpolate="monotone") + base.mark_point(filled=True, size=70)
 
 if view == "All (monthly)":
-    char
+    chart = chart + year_lines
+elif view in ["3 Months", "6 Months"]:
+    chart = chart + month_lines
+
+st.altair_chart(chart.properties(height=400), use_container_width=True)
