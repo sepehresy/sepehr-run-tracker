@@ -58,41 +58,27 @@ elif view == "4 Weeks":
     bar_width = 40
     x_axis = alt.Axis(title=x_title)
 
-elif view == "3 Months":
-    start = today - relativedelta(months=3)
+elif view in ["3 Months", "6 Months"]:
+    months_back = 3 if view == "3 Months" else 6
+    start = today - relativedelta(months=months_back)
     week_range = pd.date_range(start=start, end=today, freq="W-MON")
     df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
     weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
     df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
     df_agg["Week Label"] = df_agg["Week"].dt.strftime("%b-%d")
-    x_field = "Week Label:N"
-    x_title = "Week"
-    bar_width = 10
-    x_axis = alt.Axis(title=x_title)
+    df_agg["Month"] = df_agg["Week"].dt.month
 
-    # Month divider rule lines
-    divider_dates = df_agg[df_agg["Week"].dt.day == 1]["Week Label"].tolist()
+    # Month dividers when month changes
+    df_agg["Prev Month"] = df_agg["Month"].shift(1)
+    divider_dates = df_agg[df_agg["Month"] != df_agg["Prev Month"]]["Week Label"].tolist()
     month_lines = alt.Chart(pd.DataFrame({"x": divider_dates})).mark_rule(
         strokeDash=[4, 4], color="gray"
     ).encode(x=alt.X("x:N"))
 
-elif view == "6 Months":
-    start = today - relativedelta(months=6)
-    week_range = pd.date_range(start=start, end=today, freq="W-MON")
-    df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
-    weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
-    df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
-    df_agg["Week Label"] = df_agg["Week"].dt.strftime("%b-%d")
     x_field = "Week Label:N"
     x_title = "Week"
-    bar_width = 8
+    bar_width = 8 if view == "6 Months" else 10
     x_axis = alt.Axis(title=x_title)
-
-    # Month divider rule lines
-    divider_dates = df_agg[df_agg["Week"].dt.day == 1]["Week Label"].tolist()
-    month_lines = alt.Chart(pd.DataFrame({"x": divider_dates})).mark_rule(
-        strokeDash=[4, 4], color="gray"
-    ).encode(x=alt.X("x:N"))
 
 elif view == "1 Year":
     months = [(today.replace(day=1) - relativedelta(months=12 - i)) for i in range(13)]
@@ -147,8 +133,4 @@ elif chart_style == "Area + Dots":
     chart = base.mark_area(opacity=0.5, interpolate="monotone") + base.mark_point(filled=True, size=70)
 
 if view == "All (monthly)":
-    chart = chart + year_lines
-elif view in ["3 Months", "6 Months"]:
-    chart = chart + month_lines
-
-st.altair_chart(chart.properties(height=400), use_container_width=True)
+    char
