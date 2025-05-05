@@ -40,6 +40,8 @@ def render_activities(df):
                     if not lap_df.empty:
                         lap_df = lap_df.sort_values("KM")
 
+                        st.dataframe(lap_df.set_index("KM"))
+
                         chart_data = lap_df.copy()
                         chart_data["Pace_min"] = chart_data["Pace"]
 
@@ -61,9 +63,7 @@ def render_activities(df):
                             text=alt.Text("Pace_min:Q", format=".2f")
                         )
 
-                        st.altair_chart((bars + pace_labels).properties(height=300), use_container_width=True)
-
-                        st.dataframe(lap_df.set_index("KM"))
+                        st.altair_chart((bars + pace_labels).properties(height=400), use_container_width=True)
 
                 except Exception as e:
                     st.warning(f"Could not parse lap details: {e}")
