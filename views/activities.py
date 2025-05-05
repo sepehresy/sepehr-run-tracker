@@ -76,7 +76,7 @@ def render_activities(df):
 
                     # Add vertical line for average pace
                     avg_pace = lap_df["Pace"].mean()
-                    ax.axvline(x=avg_pace, color="red", linestyle="--", linewidth=1, label=f"Avg Pace: {avg_pace:.2f}")
+                    ax.axvline(x=avg_pace, color="red", linestyle="--", linewidth=1, label=f"Avg Pace: {format_pace(avg_pace)}")
                     ax.legend(loc="lower right")
 
                     # Add headers
