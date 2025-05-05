@@ -12,50 +12,58 @@ def render_activities(df):
     if "Lap Details" in df.columns:
         st.subheader("Splits (per run)")
 
-        for _, row in df.sort_values("Date", ascending=False).iterrows():
-            if pd.notna(row["Lap Details"]):
-                st.markdown(f"**{row['Date'].date()} - {row['Name']}**")
-                try:
-                    laps_raw = re.findall(r"Lap (\d+):\s*([^|]+)", row["Lap Details"].replace("\\n", " "))
-                    lap_data = []
-                    for lap_number, details in laps_raw:
-                        parts = [x.strip() for x in details.split(",")]
-                        lap_info = {"Lap": int(lap_number)}
-                        for p in parts:
-                            if p.endswith("km"):
-                                lap_info["Distance"] = float(p.replace("km", ""))
-                            elif re.match(r"\d+:\d+", p):
-                                lap_info["Time"] = p
-                            elif p.startswith("pace"):
-                                lap_info["Pace"] = float(p.replace("pace", "").strip())
-                            elif p.startswith("HR"):
-                                lap_info["HR"] = int(float(p.replace("HR", "").strip()))
-                            elif p.startswith("Cad"):
-                                lap_info["Cad"] = int(float(p.replace("Cad", "").strip()))
-                            elif p.startswith("ElevGain"):
-                                lap_info["ElevGain"] = float(p.replace("ElevGain", "").strip())
-                        lap_data.append(lap_info)
+        activity_options = df.sort_values("Date", ascending=False).apply(
+            lambda row: f"{row['Date'].date()} - {row['Name']}", axis=1
+        )
+        selected_activity = st.selectbox("Select an activity to view splits:", activity_options)
 
-                    lap_df = pd.DataFrame(lap_data)
-                    if not lap_df.empty:
-                        lap_df["Label"] = lap_df["Distance"].astype(int).astype(str)
+        selected_row = df[df.apply(
+            lambda row: f"{row['Date'].date()} - {row['Name']}" == selected_activity, axis=1
+        )].iloc[0]
 
-                        fig, ax = plt.subplots(figsize=(10, 0.4 * len(lap_df)))
-                        bars = ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
+        if pd.notna(selected_row["Lap Details"]):
+            try:
+                laps_raw = re.findall(r"Lap (\d+):\s*([^|]+)", selected_row["Lap Details"].replace("\\n", " "))
+                lap_data = []
+                for lap_number, details in laps_raw:
+                    parts = [x.strip() for x in details.split(",")]
+                    lap_info = {"Lap": int(lap_number)}
+                    for p in parts:
+                        if p.endswith("km"):
+                            lap_info["Distance"] = float(p.replace("km", ""))
+                        elif re.match(r"\d+:\d+", p):
+                            lap_info["Time"] = p
+                        elif p.startswith("pace"):
+                            lap_info["Pace"] = float(p.replace("pace", "").strip())
+                        elif p.startswith("HR"):
+                            lap_info["HR"] = int(float(p.replace("HR", "").strip()))
+                        elif p.startswith("Cad"):
+                            lap_info["Cad"] = int(float(p.replace("Cad", "").strip()))
+                        elif p.startswith("ElevGain"):
+                            lap_info["ElevGain"] = float(p.replace("ElevGain", "").strip())
+                    lap_data.append(lap_info)
 
-                        for i, row in lap_df.iterrows():
-                            ax.text(0, i, f"{row['Distance']:.0f}", va='center', ha='left', fontweight='bold')
-                            ax.text(0.7, i, f"{row['Time']}", va='center', ha='left')
-                            ax.text(row["Pace"] + 0.1, i, f"{row['ElevGain']:.0f} | {row['HR']}", va='center', ha='left')
+                lap_df = pd.DataFrame(lap_data)
+                if not lap_df.empty:
+                    lap_df["Label"] = lap_df["Distance"].astype(int).astype(str)
 
-                        ax.set_yticks(lap_df.index)
-                        ax.set_yticklabels(["" for _ in lap_df.index])
-                        ax.set_xlabel("Pace (min/km)")
-                        ax.invert_yaxis()
-                        ax.grid(True, axis='x', linestyle='--', alpha=0.5)
-                        ax.set_xlim(0, max(lap_df["Pace"]) + 2)
-                        st.pyplot(fig)
+                    fig, ax = plt.subplots(figsize=(10, 0.4 * len(lap_df)))
+                    bars = ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
 
-                except Exception as e:
-                    st.warning(f"Could not parse lap details: {e}")
-                st.markdown("---")
+                    for i, row in lap_df.iterrows():
+                        ax.text(0, i, f"{row['Distance']:.0f}", va='center', ha='left', fontweight='bold')
+                        ax.text(0.7, i, f"{row['Time']}", va='center', ha='left')
+                        ax.text(row["Pace"] + 0.1, i, f"{row['ElevGain']:.0f} | {row['HR']}", va='center', ha='left')
+
+                    ax.set_yticks(lap_df.index)
+                    ax.set_yticklabels(["" for _ in lap_df.index])
+                    ax.set_xlabel("Pace (min/km)")
+                    ax.invert_yaxis()
+                    ax.grid(True, axis='x', linestyle='--', alpha=0.5)
+                    ax.set_xlim(0, max(lap_df["Pace"]) + 2)
+                    st.pyplot(fig)
+
+            except Exception as e:
+                st.warning(f"Could not parse lap details: {e}")
+
+        st.markdown("---")
