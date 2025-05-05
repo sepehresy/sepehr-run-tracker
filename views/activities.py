@@ -21,10 +21,18 @@ def render_activities(df):
             lambda row: f"{row['Date'].date()} - {row['Name']}" == selected_activity, axis=1
         )].iloc[0]
 
+        def format_pace(p):
+            try:
+                minutes = int(p)
+                seconds = int(round((p - minutes) * 60))
+                return f"{minutes}:{seconds:02d}"
+            except:
+                return "-"
+
         # Show summary metrics above plot
         metrics = [
             ("Total Distance (km)", selected_row.get("Distance (km)", "-")),
-            ("Pace (min/km)", selected_row.get("Pace (min/km)", "-")),
+            ("Pace (min/km)", format_pace(float(selected_row.get("Pace (min/km)", 0))) if selected_row.get("Pace (min/km)") != "-" else "-"),
             ("Moving Time", selected_row.get("Moving Time", "-")),
             ("Cadence", selected_row.get("Cadence", "-")),
             ("Power (W)", selected_row.get("Power (W)", "-")),
@@ -84,7 +92,7 @@ def render_activities(df):
                         ax.text(-4.8, i, f"{row['Time']}", va='center', ha='left')
                         ax.text(-3.8, i, f"{int(row['ElevGain'])}", va='center', ha='left')
                         ax.text(-2.8, i, f"{row['HR']}", va='center', ha='left')
-                        ax.text(-1.8, i, f"{row['Pace']:.2f}", va='center', ha='left')
+                        ax.text(-1.8, i, format_pace(row['Pace']), va='center', ha='left')
 
                     ax.set_yticks([])
                     ax.set_xlabel("Pace (min/km)")
