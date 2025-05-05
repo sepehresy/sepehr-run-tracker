@@ -62,11 +62,10 @@ elif view == "4 Weeks":
 elif view in ["3 Months", "6 Months"]:
     months_back = 3 if view == "3 Months" else 6
     start = today - relativedelta(months=months_back)
-    week_range = pd.date_range(start=start, end=today, freq="W-MON")
     df["Week"] = df["Date"] - pd.to_timedelta(df["Date"].dt.weekday, unit='d')
     df["Week"] = df["Week"].dt.normalize()
-    weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
-    df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
+    weekly_km = df[df["Week"] >= start].groupby("Week")["Distance (km)"].sum().reset_index()
+    df_agg = weekly_km.copy()
     df_agg["WeekStart"] = df_agg["Week"]
     df_agg = df_agg.sort_values("WeekStart")
     df_agg["Month"] = df_agg["WeekStart"].dt.month
