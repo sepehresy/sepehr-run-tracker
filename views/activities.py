@@ -25,7 +25,8 @@ def render_activities(df):
                                 lap_info[k.strip()] = v.strip()
                             lap_data.append(lap_info)
                     lap_df = pd.DataFrame(lap_data)
-                    st.dataframe(lap_df[[col for col in ["Lap", "Distance", "pace", "HR", "Cad", "Elev Gain"] if col in lap_df.columns]])
+                    lap_df = lap_df.set_index("Lap")
+                    st.dataframe(lap_df[[col for col in ["Distance", "pace", "HR", "Cad", "Elev Gain"] if col in lap_df.columns]])
                 except Exception as e:
                     st.warning(f"Could not parse lap details: {e}")
                 st.markdown("---")
