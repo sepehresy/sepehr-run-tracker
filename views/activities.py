@@ -38,20 +38,19 @@ def render_activities(df):
 
                     lap_df = pd.DataFrame(lap_data)
                     if not lap_df.empty:
-                        st.dataframe(lap_df.set_index("Lap"), use_container_width=True)
+                        lap_df["Label"] = lap_df["Distance"].astype(int).astype(str)
 
-                        # Create strava-like table chart with bars
                         fig, ax = plt.subplots(figsize=(10, 0.4 * len(lap_df)))
                         bars = ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
 
-                        for i, (dist, pace, elev, hr) in enumerate(zip(lap_df["Distance"], lap_df["Pace"], lap_df["ElevGain"], lap_df["HR"])):
-                            ax.text(0.01, i, f"{int(dist)}", va='center', ha='left', color='black', fontweight='bold')
-                            ax.text(pace + 0.1, i, f"{elev:.0f} | {hr}", va='center', ha='left', color='black')
+                        for i, row in lap_df.iterrows():
+                            ax.text(0, i, f"{row['Distance']:.0f}", va='center', ha='left', fontweight='bold')
+                            ax.text(0.7, i, f"{row['Time']}", va='center', ha='left')
+                            ax.text(row["Pace"] + 0.1, i, f"{row['ElevGain']:.0f} | {row['HR']}", va='center', ha='left')
 
                         ax.set_yticks(lap_df.index)
-                        ax.set_yticklabels([f"{lap_df.loc[i, 'Time']}" for i in lap_df.index])
+                        ax.set_yticklabels(["" for _ in lap_df.index])
                         ax.set_xlabel("Pace (min/km)")
-                        ax.set_ylabel("Lap")
                         ax.invert_yaxis()
                         ax.grid(True, axis='x', linestyle='--', alpha=0.5)
                         ax.set_xlim(0, max(lap_df["Pace"]) + 2)
