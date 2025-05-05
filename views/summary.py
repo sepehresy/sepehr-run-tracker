@@ -131,4 +131,17 @@ def render_summary(df, today):
     if view_option == "All (monthly)":
         chart = chart + year_lines
 
+        if view_option == "Weekly":
+        annotation = alt.Chart(df_agg).mark_text(
+            align="center",
+            baseline="bottom",
+            dy=-5,
+            fontSize=11
+        ).encode(
+            x=alt.X(x_field, sort=df_agg["Day"].tolist()),
+            y="Distance (km):Q",
+            text=alt.Text("Pace (min/km):Q", format=".2f")
+        )
+        chart += annotation
+
     st.altair_chart(chart.properties(height=400), use_container_width=True)
