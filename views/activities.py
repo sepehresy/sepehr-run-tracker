@@ -17,9 +17,13 @@ def render_activities(df):
                     lap_data = []
                     for lap in laps_raw:
                         if lap.strip():
-                            parts = lap.split(",")
-                            lap_info = {kv.split(":")[0].strip(): kv.split(":")[1].strip() for kv in parts if ":" in kv}
-                            lap_info["Lap"] = lap.split(":")[0].strip().split()[0]
+                            parts = [p.strip() for p in lap.strip().split(",") if p.strip()]
+                            lap_info = {}
+                            for kv in parts:
+                                if ":" in kv:
+                                    k, v = kv.split(":", 1)
+                                    lap_info[k.strip()] = v.strip()
+                            lap_info["Lap"] = lap.strip().split(",")[0].strip().split()[0]
                             lap_data.append(lap_info)
                     lap_df = pd.DataFrame(lap_data)
                     lap_df.set_index("Lap", inplace=True)
