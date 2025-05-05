@@ -27,7 +27,14 @@ def render_summary(df, today):
         day_labels = [(d.strftime("%a (%b %d)")) for d in ordered_days]
         df_week["Day"] = df_week["Date"].dt.strftime("%a (%b %d)")
         daily_km = df_week.groupby("Day")["Distance (km)"].sum().reindex(day_labels).fillna(0).reset_index()
-        df_agg = daily_km
+        df_metrics = df_week.groupby("Day").agg({
+            "Distance (km)": "sum",
+            "Pace (min/km)": "mean",
+            "Avg HR": "mean",
+            "Cadence": "mean",
+            "Elevation Gain": "sum"
+        }).reindex(day_labels).fillna(0).reset_index()
+        df_agg = df_metrics
         x_field = "Day:N"
         x_title = "Day"
         bar_width = 60
@@ -104,7 +111,7 @@ def render_summary(df, today):
     base = alt.Chart(df_agg).encode(
         x=alt.X(x_field, title=x_title, axis=x_axis, sort=df_agg[sort_field].tolist() if sort_field else None),
         y=alt.Y("Distance (km):Q", title="Distance (km)"),
-        tooltip=[df_agg.columns[0], "Distance (km)"]
+        tooltip=[df_agg.columns[0], "Distance (km)", "Pace (min/km)", "Avg HR", "Cadence", "Elevation Gain"]
     )
 
     if chart_style == "Bar":
