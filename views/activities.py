@@ -38,25 +38,19 @@ def render_activities(df):
 
                     lap_df = pd.DataFrame(lap_data)
                     if not lap_df.empty:
-                        st.altair_chart(
-                            alt.Chart(lap_df).mark_bar(color="#00BFFF").encode(
-                                x=alt.X("KM:O", title="KM"),
-                                y=alt.Y("Pace:Q", title="Pace (min/km)"),
-                                tooltip=["KM", "Time", "Pace", "Elev", "HR"]
-                            ) +
-                            alt.Chart(lap_df).mark_text(
-                                align="left",
-                                dx=5,
-                                dy=3,
-                                fontSize=12,
-                                color="#333"
-                            ).encode(
-                                x="KM:O",
-                                y="Pace:Q",
-                                text=alt.Text("Pace", format=".2f")
-                            ),
-                            use_container_width=True
+                        base = alt.Chart(lap_df).encode(x=alt.X("KM:O", title="KM"))
+
+                        pace_bar = base.mark_bar(color="#00BFFF").encode(
+                            y=alt.Y("Pace:Q", title="Pace (min/km)"),
+                            tooltip=["KM", "Time", "Pace", "Elev", "HR"]
                         )
+
+                        text = base.mark_text(align="left", dx=5, dy=3, fontSize=12).encode(
+                            y="Pace:Q",
+                            text=alt.Text("Pace", format=".2f")
+                        )
+
+                        st.altair_chart((pace_bar + text).properties(height=300), use_container_width=True)
 
                         st.dataframe(lap_df.set_index("KM"))
 
