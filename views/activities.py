@@ -20,7 +20,7 @@ def render_activities(df):
                     lap_data = []
                     for lap_number, details in laps_raw:
                         parts = [x.strip() for x in details.split(",")]
-                        lap_info = {"KM": int(lap_number)}
+                        lap_info = {"Lap": int(lap_number)}
                         for p in parts:
                             if p.endswith("km"):
                                 lap_info["Distance"] = float(p.replace("km", ""))
@@ -33,42 +33,12 @@ def render_activities(df):
                             elif p.startswith("Cad"):
                                 lap_info["Cad"] = int(float(p.replace("Cad", "").strip()))
                             elif p.startswith("ElevGain"):
-                                lap_info["Elev"] = float(p.replace("ElevGain", "").strip())
+                                lap_info["ElevGain"] = float(p.replace("ElevGain", "").strip())
                         lap_data.append(lap_info)
 
                     lap_df = pd.DataFrame(lap_data)
                     if not lap_df.empty:
-                        lap_df = lap_df.sort_values("KM")
-
-                        # Create base bar chart for pace
-                        pace_chart = alt.Chart(lap_df).mark_bar(color="#00BFFF").encode(
-                            x=alt.X("KM:O", title="KM"),
-                            y=alt.Y("Pace:Q", title="Pace (min/km)"),
-                            tooltip=["KM", "Time", "Pace", "HR", "Elev"]
-                        )
-
-                        # Add HR and Elev text annotations
-                        text_chart = alt.Chart(lap_df).mark_text(align='left', dx=3, dy=5, color='white').encode(
-                            x=alt.X("KM:O"),
-                            y=alt.Y("Pace:Q"),
-                            text=alt.Text("HR:N", format="d")
-                        )
-
-                        elev_chart = alt.Chart(lap_df).mark_text(align='left', dx=3, dy=-15, color='white').encode(
-                            x=alt.X("KM:O"),
-                            y=alt.Y("Pace:Q"),
-                            text=alt.Text("Elev:N")
-                        )
-
-                        st.altair_chart(
-                            (pace_chart + text_chart + elev_chart).properties(height=300),
-                            use_container_width=True
-                        )
-
-                        st.dataframe(
-                            lap_df[["KM", "Time", "Pace", "Elev", "HR"]].set_index("KM"),
-                            use_container_width=True
-                        )
+                        st.dataframe(lap_df.set_index("Lap"), use_container_width=True)
 
                 except Exception as e:
                     st.warning(f"Could not parse lap details: {e}")
