@@ -15,7 +15,7 @@ def render_activities(df):
             if pd.notna(row["Lap Details"]):
                 st.markdown(f"**{row['Date'].date()} - {row['Name']}**")
                 try:
-                    laps_raw = re.findall(r"Lap (\d+):\\s*([^|]+)", row["Lap Details"])
+                    laps_raw = re.findall(r"Lap (\d+):\s*([^|]+)", row["Lap Details"].replace("\\n", " "))
                     lap_data = []
                     for lap_number, details in laps_raw:
                         parts = [x.strip() for x in details.split(",")]
