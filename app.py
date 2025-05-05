@@ -52,11 +52,11 @@ elif view == "4 Weeks":
     df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
     weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
     df_agg = pd.DataFrame({"Week": weeks}).merge(weekly_km, on="Week", how="left").fillna(0)
-    df_agg["Week Label"] = df_agg["Week"].dt.strftime("%b-%d")
-    x_field = "Week Label:N"
+    df_agg["WeekStart"] = df_agg["Week"]
+    x_field = "WeekStart:T"
     x_title = "Week"
     bar_width = 40
-    x_axis = alt.Axis(title=x_title)
+    x_axis = alt.Axis(title=x_title, format="%b-%d")
 
 elif view in ["3 Months", "6 Months"]:
     months_back = 3 if view == "3 Months" else 6
@@ -65,20 +65,20 @@ elif view in ["3 Months", "6 Months"]:
     df["Week"] = df["Date"].dt.to_period("W").apply(lambda r: r.start_time)
     weekly_km = df.groupby("Week")["Distance (km)"].sum().reset_index()
     df_agg = pd.DataFrame({"Week": week_range}).merge(weekly_km, on="Week", how="left").fillna(0)
-    df_agg["Week Label"] = df_agg["Week"].dt.strftime("%b-%d")
+    df_agg["WeekStart"] = df_agg["Week"]
     df_agg["Month"] = df_agg["Week"].dt.month
 
     # Month dividers when month changes
     df_agg["Prev Month"] = df_agg["Month"].shift(1)
-    divider_dates = df_agg[df_agg["Month"] != df_agg["Prev Month"]]["Week Label"].tolist()
+    divider_dates = df_agg[df_agg["Month"] != df_agg["Prev Month"]]["WeekStart"]
     month_lines = alt.Chart(pd.DataFrame({"x": divider_dates})).mark_rule(
         strokeDash=[4, 4], color="gray"
-    ).encode(x=alt.X("x:N"))
+    ).encode(x="x:T")
 
-    x_field = "Week Label:N"
+    x_field = "WeekStart:T"
     x_title = "Week"
     bar_width = 8 if view == "6 Months" else 10
-    x_axis = alt.Axis(title=x_title)
+    x_axis = alt.Axis(title=x_title, format="%b-%d", labelAngle=-45, labelFontSize=10)
 
 elif view == "1 Year":
     months = [(today.replace(day=1) - relativedelta(months=12 - i)) for i in range(13)]
