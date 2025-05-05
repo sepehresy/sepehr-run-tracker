@@ -77,7 +77,7 @@ elif view in ["3 Months", "6 Months"]:
     ).encode(x="x:T")
     x_field = "WeekStart:T"
     x_title = "Week"
-    bar_width = 10
+    bar_width = 20
     x_axis = alt.Axis(title=x_title, format="%b-%d", labelAngle=-45, labelFontSize=10)
 
 elif view == "1 Year":
