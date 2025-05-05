@@ -21,6 +21,22 @@ def render_activities(df):
             lambda row: f"{row['Date'].date()} - {row['Name']}" == selected_activity, axis=1
         )].iloc[0]
 
+        # Show summary metrics above plot
+        metrics = [
+            ("Total Distance (km)", selected_row.get("Distance (km)", "-")),
+            ("Pace (min/km)", selected_row.get("Pace (min/km)", "-")),
+            ("Moving Time", selected_row.get("Moving Time", "-")),
+            ("Cadence", selected_row.get("Cadence", "-")),
+            ("Power (W)", selected_row.get("Power (W)", "-")),
+            ("Avg HR", selected_row.get("Avg HR", "-")),
+            ("Max HR", selected_row.get("Max HR", "-")),
+            ("Elevation Gain", selected_row.get("Elevation Gain", "-")),
+            ("Calories", selected_row.get("Calories", "-")),
+        ]
+        cols = st.columns(len(metrics))
+        for i, (label, value) in enumerate(metrics):
+            cols[i].metric(label, value)
+
         if pd.notna(selected_row["Lap Details"]):
             try:
                 laps_raw = re.findall(r"Lap (\d+):\s*([^|]+)", selected_row["Lap Details"].replace("\\n", " "))
