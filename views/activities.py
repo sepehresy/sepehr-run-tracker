@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import re
-import altair as alt
 
 
 def render_activities(df):
