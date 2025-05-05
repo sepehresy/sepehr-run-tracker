@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 import re
 import matplotlib.pyplot as plt
-import openai
+from openai import OpenAI
 import os
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def render_activities(df):
     st.title("📋 Activities")
@@ -106,7 +106,7 @@ def render_activities(df):
                         f"\nLap Data:\n{lap_df.to_csv(index=False)}"
                     )
                     with st.spinner("Thinking..."):
-                        response = openai.ChatCompletion.create(
+                        response = client.chat.completions.create(
                             model="gpt-4",
                             messages=[
                                 {"role": "system", "content": "You are a professional running coach."},
@@ -114,7 +114,7 @@ def render_activities(df):
                             ]
                         )
                         st.success("Here's your AI feedback:")
-                        st.write(response["choices"][0]["message"]["content"])
+                        st.write(response.choices[0].message.content)
 
             except Exception as e:
                 st.warning(f"Could not parse lap details: {e}")
