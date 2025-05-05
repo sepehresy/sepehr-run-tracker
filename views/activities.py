@@ -17,17 +17,15 @@ def render_activities(df):
                     lap_data = []
                     for lap in laps_raw:
                         if lap.strip():
-                            parts = [p.strip() for p in lap.strip().split(",") if p.strip()]
-                            lap_info = {}
+                            lap_number = lap.strip().split("km")[0].strip().replace(":", "")
+                            parts = [p.strip() for p in lap.strip().split(",") if ":" in p]
+                            lap_info = {"Lap": lap_number}
                             for kv in parts:
-                                if ":" in kv:
-                                    k, v = kv.split(":", 1)
-                                    lap_info[k.strip()] = v.strip()
-                            lap_info["Lap"] = lap.strip().split(",")[0].strip().split()[0]
+                                k, v = kv.split(":", 1)
+                                lap_info[k.strip()] = v.strip()
                             lap_data.append(lap_info)
                     lap_df = pd.DataFrame(lap_data)
-                    lap_df.set_index("Lap", inplace=True)
-                    st.dataframe(lap_df)
+                    st.dataframe(lap_df[[col for col in ["Lap", "Distance", "pace", "HR", "Cad", "Elev Gain"] if col in lap_df.columns]])
                 except Exception as e:
                     st.warning(f"Could not parse lap details: {e}")
                 st.markdown("---")
