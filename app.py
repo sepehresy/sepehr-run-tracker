@@ -71,9 +71,10 @@ elif view == "3 Months":
     x_axis = alt.Axis(title=x_title)
 
     # Month divider rule lines
-    month_lines = alt.Chart(df_agg[df_agg["Week"].dt.is_month_start]).mark_rule(
+    divider_dates = df_agg[df_agg["Week"].dt.day == 1]["Week Label"].tolist()
+    month_lines = alt.Chart(pd.DataFrame({"x": divider_dates})).mark_rule(
         strokeDash=[4, 4], color="gray"
-    ).encode(x="Week Label:N")
+    ).encode(x=alt.X("x:N"))
 
 elif view == "6 Months":
     start = today - relativedelta(months=6)
@@ -88,9 +89,10 @@ elif view == "6 Months":
     x_axis = alt.Axis(title=x_title)
 
     # Month divider rule lines
-    month_lines = alt.Chart(df_agg[df_agg["Week"].dt.is_month_start]).mark_rule(
+    divider_dates = df_agg[df_agg["Week"].dt.day == 1]["Week Label"].tolist()
+    month_lines = alt.Chart(pd.DataFrame({"x": divider_dates})).mark_rule(
         strokeDash=[4, 4], color="gray"
-    ).encode(x="Week Label:N")
+    ).encode(x=alt.X("x:N"))
 
 elif view == "1 Year":
     months = [(today.replace(day=1) - relativedelta(months=12 - i)) for i in range(13)]
