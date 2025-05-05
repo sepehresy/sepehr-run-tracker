@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import re
+import altair as alt
+
 
 def render_activities(df):
     st.title("📋 Activities")
@@ -24,27 +26,44 @@ def render_activities(df):
                         lap_info = {"Lap": int(lap_number)}
                         for p in parts:
                             if p.endswith("km"):
-                                lap_info["Distance"] = p
+                                lap_info["Distance"] = float(p.replace("km", ""))
                             elif re.match(r"\d+:\d+", p):
                                 lap_info["Time"] = p
                             elif p.startswith("pace"):
-                                lap_info["Pace"] = p.replace("pace", "").strip()
+                                lap_info["Pace"] = float(p.replace("pace", "").strip())
                             elif p.startswith("HR"):
-                                lap_info["HR"] = p.replace("HR", "").strip()
+                                lap_info["HR"] = float(p.replace("HR", "").strip())
                             elif p.startswith("Cad"):
-                                lap_info["Cad"] = p.replace("Cad", "").strip()
+                                lap_info["Cad"] = float(p.replace("Cad", "").strip())
                             elif p.startswith("ElevGain"):
-                                lap_info["ElevGain"] = p.replace("ElevGain", "").strip()
+                                lap_info["ElevGain"] = float(p.replace("ElevGain", "").strip())
                         lap_data.append(lap_info)
 
                     lap_df = pd.DataFrame(lap_data)
                     if not lap_df.empty:
                         lap_df = lap_df.set_index("Lap")
-                        columns = [
-                            col for col in ["Distance", "Time", "Pace", "HR", "Cad", "ElevGain"]
-                            if col in lap_df.columns
-                        ]
-                        st.dataframe(lap_df[columns])
+                        st.dataframe(lap_df)
+
+                        # Plot bar chart like Strava
+                        base = alt.Chart(lap_df.reset_index()).encode(x=alt.X("Lap:O"))
+
+                        pace_bar = base.mark_bar(color="#00BFFF").encode(
+                            y=alt.Y("Pace:Q", title="Pace (min/km)")
+                        )
+
+                        annotation_text = base.mark_text(
+                            align="left",
+                            dx=2,
+                            dy=-5,
+                            fontSize=11,
+                            color="white"
+                        ).encode(
+                            y="Pace:Q",
+                            text=alt.Text("Lap:O",
+                                format="Lap {Lap}: HR={HR}, Cad={Cad}, Elev={ElevGain}")
+                        )
+
+                        st.altair_chart(pace_bar + annotation_text, use_container_width=True)
                 except Exception as e:
                     st.warning(f"Could not parse lap details: {e}")
                 st.markdown("---")
