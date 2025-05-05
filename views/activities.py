@@ -46,14 +46,22 @@ def render_activities(df):
                 lap_df = pd.DataFrame(lap_data)
                 if not lap_df.empty:
                     fig, ax = plt.subplots(figsize=(10, 0.4 * len(lap_df)))
+
+                    # Plot bars
                     bars = ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
 
-                    for i, row in lap_df.iterrows():
-                        ax.text(-0.2, i, f"{row['Distance']:.2f}", va='center', ha='right', fontweight='bold')
-                        ax.text(0, i, f"{row['Time']}  {row['ElevGain']:.0f} | {row['HR']}", va='center', ha='left')
+                    # Add headers
+                    ax.text(-2.5, -1, "KM", fontweight='bold')
+                    ax.text(-1.5, -1, "Time", fontweight='bold')
+                    ax.text(1, -1, "Elev | HR", fontweight='bold')
 
-                    ax.set_yticks(lap_df.index)
-                    ax.set_yticklabels(["" for _ in lap_df.index])
+                    # Add data text
+                    for i, row in lap_df.iterrows():
+                        ax.text(-2.5, i, f"{row['Distance']:.2f}", va='center', ha='left', fontweight='bold')
+                        ax.text(-1.5, i, f"{row['Time']}", va='center', ha='left')
+                        ax.text(1, i, f"{int(row['ElevGain'])} | {row['HR']}", va='center', ha='left')
+
+                    ax.set_yticks([])
                     ax.set_xlabel("Pace (min/km)")
                     ax.invert_yaxis()
                     ax.grid(True, axis='x', linestyle='--', alpha=0.5)
