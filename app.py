@@ -4,6 +4,7 @@ from datetime import datetime
 from views.summary import render_summary
 from views.activities import render_activities
 from views.ai_analysis import render_ai_analysis
+from views.race_planning import render_race_planning  # Add this import
 
 # Set Streamlit app config
 st.set_page_config(page_title="Sepehr's Running Dashboard", layout="wide")
@@ -23,7 +24,7 @@ today = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
 
 # Sidebar navigation
 st.sidebar.title("📁 Dashboard View")
-view = st.sidebar.radio("Navigate to:", ["📊 Summary", "📂 Activities", "🧠 AI Analysis"])
+view = st.sidebar.radio("Navigate to:", ["📊 Summary", "📂 Activities", "🏁 Race Planning", "🧠 AI Analysis"])
 
 # Render views based on selected section
 if view == "📊 Summary":
@@ -31,6 +32,9 @@ if view == "📊 Summary":
 
 elif view == "📂 Activities":
     render_activities(df)
+
+elif view == "🏁 Race Planning":
+    render_race_planning(df, today)
 
 elif view == "🧠 AI Analysis":
     render_ai_analysis(df, today)
