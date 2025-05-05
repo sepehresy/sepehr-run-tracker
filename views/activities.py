@@ -50,8 +50,7 @@ def render_activities(df):
 
                     for i, row in lap_df.iterrows():
                         ax.text(-0.2, i, f"{row['Distance']:.2f}", va='center', ha='right', fontweight='bold')
-                        ax.text(0, i, f"{row['Time']}", va='center', ha='left')
-                        ax.text(row["Pace"] + 0.1, i, f"{row['ElevGain']:.0f} | {row['HR']}", va='center', ha='left')
+                        ax.text(0, i, f"{row['Time']}  {row['ElevGain']:.0f} | {row['HR']}", va='center', ha='left')
 
                     ax.set_yticks(lap_df.index)
                     ax.set_yticklabels(["" for _ in lap_df.index])
