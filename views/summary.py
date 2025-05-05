@@ -34,6 +34,10 @@ def render_summary(df, today):
             "Cadence": "mean",
             "Elevation Gain": "sum"
         }).reindex(day_labels).fillna(0).reset_index()
+        df_metrics["PaceLabel"] = df_metrics["Pace (min/km)"].apply(lambda x: f"Pace={int(x)}:{int((x%1)*60):02d}" if x > 0 else "")
+        df_metrics["HRLabel"] = df_metrics["Avg HR"].apply(lambda x: f"HR={int(x)}" if x > 0 else "")
+        df_metrics["CadLabel"] = df_metrics["Cadence"].apply(lambda x: f"Cad={int(x)}" if x > 0 else "")
+        df_metrics["ElevLabel"] = df_metrics["Elevation Gain"].apply(lambda x: f"Elev={int(x)}" if x > 0 else "")
         df_agg = df_metrics
         x_field = "Day:N"
         x_title = "Day"
@@ -132,9 +136,7 @@ def render_summary(df, today):
         chart = chart + year_lines
 
     if view_option == "Weekly":
-        for i, (field, label) in enumerate(zip([
-            "Pace (min/km)", "Avg HR", "Cadence", "Elevation Gain"
-        ], ["Pace", "HR", "Cad", "Elev"])):
+        for i, label_field in enumerate(["PaceLabel", "HRLabel", "CadLabel", "ElevLabel"]):
             annotation = alt.Chart(df_agg).mark_text(
                 color="white",
                 align="center",
@@ -144,7 +146,7 @@ def render_summary(df, today):
             ).encode(
                 x=alt.X(x_field, sort=df_agg["Day"].tolist()),
                 y=alt.Y("Distance (km):Q"),
-                text=alt.Text(f"'{label}=' + datum['{field}'].toFixed({1 if 'Pace' in field else 0})")
+                text=label_field
             )
             chart += annotation
 
