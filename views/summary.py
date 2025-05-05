@@ -20,8 +20,8 @@ def render_summary(df, today):
     )
 
     if view_option == "Weekly":
-        start = today - timedelta(days=today.weekday())
-        end = start + timedelta(days=6)
+        start = today - timedelta(days=6)
+        end = today
         df_week = df[(df["Date"] >= start) & (df["Date"] <= end)].copy()
         ordered_days = [(start + timedelta(days=i)) for i in range(7)]
         day_labels = [(d.strftime("%a (%b %d)")) for d in ordered_days]
