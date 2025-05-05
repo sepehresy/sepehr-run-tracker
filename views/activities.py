@@ -2,7 +2,10 @@ import streamlit as st
 import pandas as pd
 import re
 import matplotlib.pyplot as plt
+import openai
+import os
 
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def render_activities(df):
     st.title("📋 Activities")
@@ -70,23 +73,18 @@ def render_activities(df):
                 lap_df = pd.DataFrame(lap_data)
                 if not lap_df.empty:
                     fig, ax = plt.subplots(figsize=(10, 0.4 * len(lap_df)))
-
-                    # Plot bars
                     bars = ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
 
-                    # Add vertical line for average pace
                     avg_pace = lap_df["Pace"].mean()
                     ax.axvline(x=avg_pace, color="red", linestyle="--", linewidth=1, label=f"Avg Pace: {format_pace(avg_pace)}")
                     ax.legend(loc="lower right")
 
-                    # Add headers
                     ax.text(-5.8, -1, "KM", fontweight='bold')
                     ax.text(-4.8, -1, "Time", fontweight='bold')
                     ax.text(-3.8, -1, "Elev", fontweight='bold')
                     ax.text(-2.8, -1, "HR", fontweight='bold')
                     ax.text(-1.8, -1, "Pace", fontweight='bold')
 
-                    # Add data text to the left of the bars
                     for i, row in lap_df.iterrows():
                         ax.text(-5.8, i, f"{row['Distance']:.2f}", va='center', ha='left', fontweight='bold')
                         ax.text(-4.8, i, f"{row['Time']}", va='center', ha='left')
@@ -100,6 +98,24 @@ def render_activities(df):
                     ax.grid(True, axis='x', linestyle='--', alpha=0.5)
                     ax.set_xlim(0, max(lap_df["Pace"]) + 2)
                     st.pyplot(fig)
+
+                    st.subheader("🧠 AI Analysis of This Run")
+                    if st.button("Generate AI Analysis"):
+                        prompt = (
+                            "Analyze this running activity based on the following per-lap data.\n"
+                            "Comment on pacing, heart rate, cadence, and elevation gain.\n"
+                            f"\nLap Data:\n{lap_df.to_csv(index=False)}"
+                        )
+                        with st.spinner("Thinking..."):
+                            response = openai.ChatCompletion.create(
+                                model="gpt-4",
+                                messages=[
+                                    {"role": "system", "content": "You are a professional running coach."},
+                                    {"role": "user", "content": prompt}
+                                ]
+                            )
+                            st.success("Here's your AI feedback:")
+                            st.write(response["choices"][0]["message"]["content"])
 
             except Exception as e:
                 st.warning(f"Could not parse lap details: {e}")
