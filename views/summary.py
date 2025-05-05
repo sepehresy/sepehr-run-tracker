@@ -144,7 +144,7 @@ def render_summary(df, today):
             ).encode(
                 x=alt.X(x_field, sort=df_agg["Day"].tolist()),
                 y=alt.Y("Distance (km):Q"),
-                text=alt.Text(f"{field}:Q", format=".0f")
+                text=alt.Text(f"'{label}=' + datum['{field}'].toFixed({1 if 'Pace' in field else 0})")
             )
             chart += annotation
 
