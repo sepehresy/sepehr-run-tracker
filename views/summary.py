@@ -23,7 +23,7 @@ def render_summary(df, today):
         start = today - timedelta(days=today.weekday())
         end = start + timedelta(days=6)
         df_week = df[(df["Date"] >= start) & (df["Date"] <= end)].copy()
-        df_week["Day"] = df_week["Date"].dt.strftime("%a (%m/%d)")
+        df_week["Day"] = df_week["Date"].dt.strftime("%a (%b %d)")
         daily_km = df_week.groupby("Day")["Distance (km)"].sum().reindex(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]).fillna(0).reset_index()
         df_agg = daily_km
         x_field = "Day:N"
