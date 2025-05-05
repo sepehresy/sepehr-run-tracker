@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
+import matplotlib.pyplot as plt
 
 
 def render_activities(df):
@@ -38,6 +39,15 @@ def render_activities(df):
                     lap_df = pd.DataFrame(lap_data)
                     if not lap_df.empty:
                         st.dataframe(lap_df.set_index("Lap"), use_container_width=True)
+
+                        # Create strava-like bar chart for pace
+                        fig, ax = plt.subplots(figsize=(8, 0.4 * len(lap_df)))
+                        ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
+                        ax.set_xlabel("Pace (min/km)")
+                        ax.set_ylabel("Lap")
+                        ax.invert_yaxis()
+                        ax.grid(True, axis='x', linestyle='--', alpha=0.5)
+                        st.pyplot(fig)
 
                 except Exception as e:
                     st.warning(f"Could not parse lap details: {e}")
