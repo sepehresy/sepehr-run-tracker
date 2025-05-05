@@ -17,16 +17,24 @@ def render_activities(df):
                     lap_data = []
                     for lap in laps_raw:
                         if lap.strip():
-                            lap_number = lap.strip().split()[0].replace(":", "")
-                            parts = [p.strip() for p in lap.strip().split(",") if ":" in p]
-                            lap_info = {"Lap": int(lap_number)}
-                            for kv in parts:
-                                k, v = kv.split(":", 1)
-                                lap_info[k.strip()] = v.strip()
+                            lap_lines = lap.strip().split(",")
+                            lap_info = {}
+                            for item in lap_lines:
+                                if ":" in item:
+                                    key, val = item.split(":", 1)
+                                    lap_info[key.strip()] = val.strip()
+                            if 'Lap' in lap_info:
+                                lap_number = lap_info.pop('Lap')
+                            else:
+                                lap_number = lap.strip().split()[0].replace(":", "")
+                            lap_info["Lap"] = int(lap_number)
                             lap_data.append(lap_info)
+
                     lap_df = pd.DataFrame(lap_data)
-                    lap_df = lap_df.set_index("Lap")
-                    st.dataframe(lap_df[[col for col in ["Distance", "pace", "HR", "Cad", "Elev Gain"] if col in lap_df.columns]])
+                    if not lap_df.empty:
+                        lap_df = lap_df.set_index("Lap")
+                        columns = [col for col in ["Distance", "Pace", "HR", "Cad", "Elev Gain"] if col in lap_df.columns]
+                        st.dataframe(lap_df[columns])
                 except Exception as e:
                     st.warning(f"Could not parse lap details: {e}")
                 st.markdown("---")
