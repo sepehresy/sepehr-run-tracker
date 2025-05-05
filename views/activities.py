@@ -51,17 +51,19 @@ def render_activities(df):
                     bars = ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
 
                     # Add headers
-                    ax.text(-4.6, -1, "KM", fontweight='bold')
-                    ax.text(-3.6, -1, "Time", fontweight='bold')
-                    ax.text(-2.6, -1, "Elev", fontweight='bold')
-                    ax.text(-1.6, -1, "HR", fontweight='bold')
+                    ax.text(-5.8, -1, "KM", fontweight='bold')
+                    ax.text(-4.8, -1, "Time", fontweight='bold')
+                    ax.text(-3.8, -1, "Elev", fontweight='bold')
+                    ax.text(-2.8, -1, "HR", fontweight='bold')
+                    ax.text(-1.8, -1, "Pace", fontweight='bold')
 
                     # Add data text to the left of the bars
                     for i, row in lap_df.iterrows():
-                        ax.text(-4.6, i, f"{row['Distance']:.2f}", va='center', ha='left', fontweight='bold')
-                        ax.text(-3.6, i, f"{row['Time']}", va='center', ha='left')
-                        ax.text(-2.6, i, f"{int(row['ElevGain'])}", va='center', ha='left')
-                        ax.text(-1.6, i, f"{row['HR']}", va='center', ha='left')
+                        ax.text(-5.8, i, f"{row['Distance']:.2f}", va='center', ha='left', fontweight='bold')
+                        ax.text(-4.8, i, f"{row['Time']}", va='center', ha='left')
+                        ax.text(-3.8, i, f"{int(row['ElevGain'])}", va='center', ha='left')
+                        ax.text(-2.8, i, f"{row['HR']}", va='center', ha='left')
+                        ax.text(-1.8, i, f"{row['Pace']:.2f}", va='center', ha='left')
 
                     ax.set_yticks([])
                     ax.set_xlabel("Pace (min/km)")
