@@ -45,7 +45,7 @@ def render_summary(df, today):
         x_field = "WeekStart:T"
         x_title = "Week"
         bar_width = 40
-        x_axis = alt.Axis(title=x_title, format="%b-%d", labelOverlap=False, labelExpr='format(datum.value, "%b-%d")')
+        x_axis = alt.Axis(title=x_title, format="%b-%d", labelOverlap=False, )
 
     elif view_option in ["3 Months", "6 Months"]:
         months_back = 3 if view_option == "3 Months" else 6
