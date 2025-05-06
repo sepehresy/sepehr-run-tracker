@@ -84,7 +84,6 @@ def render_summary(df, today):
 
     # --- STEP 1: Parse Moving Time column (MM:SS:00 format) ---
     def parse_minutes_seconds(val):
-        # print (val)
         """Parse MM:SS:00 string and return total minutes as float."""
         if pd.isnull(val):
             return 0.0
@@ -104,8 +103,6 @@ def render_summary(df, today):
     if "Moving Time" in df.columns:
 
         df["Moving Time (min)"] = df["Moving Time"].apply(parse_minutes_seconds)
-        print ("1111-------- ", df["Moving Time"])
-        print ("2222++++++-------- ",df["Moving Time (min)"])
     else:
         df["Moving Time (min)"] = 0.0
 

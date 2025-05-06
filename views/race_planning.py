@@ -7,55 +7,48 @@ import os
 from openai import OpenAI
 from views.ai_prompt import generate_ai_prompt
 
-os.makedirs("data/races", exist_ok=True)
-os.makedirs("data/analyses", exist_ok=True)
+# from app import load_gist_data, save_gist_data  # <-- Add this line
+from utils.gist_helpers import load_gist_data, save_gist_data
+
+USER_KEY = "sepehr"  # Later, make this dynamic per user
+
+def load_gist_race_data():
+    data = load_gist_data()
+    if USER_KEY not in data:
+        data[USER_KEY] = {"races": [], "training_plans": {}, "progress_feedback": {}}
+    return data
+
+def save_gist_race_data(data):
+    return save_gist_data(data)
 
 def load_saved_races():
-    try:
-        with open("data/races/races.json", "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+    data = load_gist_race_data()
+    return data[USER_KEY].get("races", [])
 
 def save_races(races):
-    try:
-        with open("data/races/races.json", "w") as f:
-            json.dump(races, f)
-        return True
-    except Exception as e:
-        st.error(f"Error saving races: {e}")
-        return False
+    data = load_gist_race_data()
+    data[USER_KEY]["races"] = races
+    return save_gist_race_data(data)
 
 def load_training_plans():
-    try:
-        with open("data/races/training_plans.json", "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+    data = load_gist_race_data()
+    return data[USER_KEY].get("training_plans", {})
 
 def save_training_plan(race_id, plan):
-    try:
-        plans = load_training_plans()
-        plans[race_id] = plan
-        with open("data/races/training_plans.json", "w") as f:
-            json.dump(plans, f)
-        return True
-    except Exception as e:
-        st.error(f"Error saving training plan: {e}")
-        return False
+    data = load_gist_race_data()
+    data[USER_KEY].setdefault("training_plans", {})
+    data[USER_KEY]["training_plans"][race_id] = plan
+    return save_gist_race_data(data)
 
 def load_progress_feedback():
-    try:
-        with open("data/analyses/race_progress.json", "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+    data = load_gist_race_data()
+    return data[USER_KEY].get("progress_feedback", {})
 
 def save_progress_feedback(race_id, entry):
-    history = load_progress_feedback()
-    history.setdefault(race_id, []).append(entry)
-    with open("data/analyses/race_progress.json", "w") as f:
-        json.dump(history, f)
+    data = load_gist_race_data()
+    data[USER_KEY].setdefault("progress_feedback", {})
+    data[USER_KEY]["progress_feedback"].setdefault(race_id, []).append(entry)
+    return save_gist_race_data(data)
 
 def render_feedback_history(race_id):
     race_history = load_progress_feedback().get(race_id, [])
@@ -149,8 +142,7 @@ def render_feedback_history(race_id):
                     feedback_list = all_history.get(race_id, [])
                     del feedback_list[len(feedback_list)-1-i]
                     all_history[race_id] = feedback_list
-                    with open("data/analyses/race_progress.json", "w") as f:
-                        json.dump(all_history, f)
+                    save_progress_feedback(race_id, feedback_list)
                     st.success("Feedback removed.")
                     st.rerun()
 
