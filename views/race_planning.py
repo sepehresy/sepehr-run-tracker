@@ -5,11 +5,11 @@ from datetime import datetime, timedelta
 import json
 import os
 from openai import OpenAI
+from views.ai_prompt import generate_ai_prompt
 
-# Create race planning directory if it doesn't exist
 os.makedirs("data/races", exist_ok=True)
+os.makedirs("data/analyses", exist_ok=True)
 
-# Function to load saved races
 def load_saved_races():
     try:
         with open("data/races/races.json", "r") as f:
@@ -17,7 +17,6 @@ def load_saved_races():
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
-# Function to save races
 def save_races(races):
     try:
         with open("data/races/races.json", "w") as f:
@@ -27,7 +26,6 @@ def save_races(races):
         st.error(f"Error saving races: {e}")
         return False
 
-# Function to load training plans
 def load_training_plans():
     try:
         with open("data/races/training_plans.json", "r") as f:
@@ -35,7 +33,6 @@ def load_training_plans():
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
-# Function to save training plans
 def save_training_plan(race_id, plan):
     try:
         plans = load_training_plans()
@@ -47,35 +44,140 @@ def save_training_plan(race_id, plan):
         st.error(f"Error saving training plan: {e}")
         return False
 
+def load_progress_feedback():
+    try:
+        with open("data/analyses/race_progress.json", "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+def save_progress_feedback(race_id, entry):
+    history = load_progress_feedback()
+    history.setdefault(race_id, []).append(entry)
+    with open("data/analyses/race_progress.json", "w") as f:
+        json.dump(history, f)
+
+def render_feedback_history(race_id):
+    race_history = load_progress_feedback().get(race_id, [])
+    if race_history:
+        st.markdown("""
+        <style>
+        .ai-feedback-card {
+            border-radius: 10px;
+            margin-bottom: 14px;
+            background: #18191a;
+            box-shadow: 0 2px 8px rgba(30,40,60,0.07);
+            border: 1px solid #23272f;
+            transition: box-shadow 0.2s;
+        }
+        .ai-feedback-summary {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 14px 18px;
+            font-size: 1.05rem;
+            color: #e6e6e6;
+            font-weight: 500;
+            border-bottom: 1px solid #23272f;
+            transition: background 0.2s;
+            justify-content: space-between;
+        }
+        .ai-feedback-summary-left {
+            display: flex;
+            align-items: center;
+        }
+        .ai-feedback-date {
+            font-size: 0.92rem;
+            color: #8a8f98;
+            margin-left: 10px;
+            font-weight: 400;
+        }
+        .ai-feedback-content {
+            padding: 18px 18px 14px 48px;
+            color: #e6e6e6;
+            font-size: 0.98rem;
+            line-height: 1.7;
+            background: #18191a;
+        }
+        .ai-feedback-icon {
+            font-size: 1.3rem;
+            margin-right: 8px;
+            color: #1EBEFF;
+        }
+        .ai-feedback-remove-btn {
+            background: none;
+            border: none;
+            color: #FF4B4B;
+            font-size: 1.1rem;
+            cursor: pointer;
+            padding: 2px 10px;
+            border-radius: 6px;
+            transition: background 0.15s;
+            margin-left: 18px;
+        }
+        .ai-feedback-remove-btn:hover {
+            background: #2a2323;
+        }
+        details[open] .ai-feedback-summary {
+            border-bottom: 1px solid #23272f;
+            background: #212226;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        st.markdown("### 🕓 AI Feedback History")
+        for i, item in enumerate(reversed(race_history)):
+            feedback_key = f"{race_id}_feedback_{len(race_history)-1-i}"
+            # Use columns to align the button with the summary (Streamlit only)
+            cols = st.columns([0.88, 0.12])
+            with cols[0]:
+                st.markdown(f"""
+                <details class="ai-feedback-card" {'open' if i == 0 else ''}>
+                  <summary class="ai-feedback-summary">
+                    <span class="ai-feedback-summary-left">
+                      <span class="ai-feedback-icon">🤖</span>
+                      <span>AI Feedback</span>
+                      <span class="ai-feedback-date">{item['date']}</span>
+                    </span>
+                  </summary>
+                  <div class="ai-feedback-content">{item['feedback']}</div>
+                </details>
+                """, unsafe_allow_html=True)
+            with cols[1]:
+                remove_btn = st.button("🗑️", key=f"remove_{feedback_key}", help="Delete this feedback")
+                if remove_btn:
+                    all_history = load_progress_feedback()
+                    feedback_list = all_history.get(race_id, [])
+                    del feedback_list[len(feedback_list)-1-i]
+                    all_history[race_id] = feedback_list
+                    with open("data/analyses/race_progress.json", "w") as f:
+                        json.dump(all_history, f)
+                    st.success("Feedback removed.")
+                    st.rerun()
+
 def render_race_planning(df, today):
-    # Ensure 'today' is a date object
     if isinstance(today, datetime):
         today = today.date()
-    
+
+    # Ensure df["Date"] is datetime
+    if "Date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["Date"]):
+        df["Date"] = pd.to_datetime(df["Date"])
+
     st.title("🏁 Race Planning")
-    
-    # Load existing races
     races = load_saved_races()
-    
-    # Section for adding a new race
+
     with st.expander("➕ Add a New Race", expanded=len(races) == 0):
         with st.form("add_race_form"):
             col1, col2 = st.columns(2)
-            
             with col1:
-                race_name = st.text_input("Race Name", key="race_name_input")
+                race_name = st.text_input("Race Name")
                 race_date = st.date_input("Race Date", min_value=today)
-                
             with col2:
                 race_distance = st.number_input("Distance (km)", min_value=1.0, step=0.1)
                 race_type = st.selectbox("Race Type", ["Road", "Trail", "Track", "Virtual"])
-            
             notes = st.text_area("Race Notes (optional)")
-            
-            submitted = st.form_submit_button("Save Race")
-            if submitted and race_name:
+            if st.form_submit_button("Save Race") and race_name:
                 new_race = {
-                    "id": f"race_{len(races) + 1}",
+                    "id": f"race_{len(races)+1}",
                     "name": race_name,
                     "date": race_date.isoformat(),
                     "distance": race_distance,
@@ -84,273 +186,202 @@ def render_race_planning(df, today):
                     "created_at": datetime.now().isoformat()
                 }
                 races.append(new_race)
-                save_success = save_races(races)
-                if save_success:
-                    st.success(f"Race '{race_name}' added successfully!")
+                if save_races(races):
+                    st.success(f"Race '{race_name}' added.")
                     st.rerun()
-    
-    # Show existing races
-    if races:
-        st.subheader("Your Upcoming Races")
-        
-        for i, race in enumerate(races):
-            race_date = datetime.fromisoformat(race["date"]).date()
-            days_until = (race_date - today).days
-            
-            with st.container():
-                cols = st.columns([3, 1, 1])
-                with cols[0]:
-                    st.markdown(f"### {race['name']}")
-                    st.write(f"📅 {race_date} ({'in ' + str(days_until) + ' days' if days_until > 0 else 'Today!' if days_until == 0 else 'Completed'})")
-                    st.write(f"🏃 {race['distance']} km | {race['type']}")
-                    if race["notes"]:
-                        st.write(f"📝 {race['notes']}")
-                
-                with cols[1]:
-                    if st.button("🗑️ Delete", key=f"delete_race_{i}"):
-                        races.pop(i)
-                        save_races(races)
-                        st.rerun()
-                
-                with cols[2]:
-                    if st.button("📋 Training Plan", key=f"plan_race_{i}"):
-                        st.session_state["selected_race"] = race
-                        st.rerun()
-            
-            st.markdown("---")
-        
-        # Training plan section - show if a race is selected
-        if "selected_race" in st.session_state:
-            selected_race = st.session_state["selected_race"]
-            race_date = datetime.fromisoformat(selected_race["date"]).date()
-            
-            st.header(f"Training Plan: {selected_race['name']}")
-            st.write(f"Race Date: {race_date} | Distance: {selected_race['distance']} km")
-            
-            # Load existing plan if available
-            plans = load_training_plans()
-            race_id = selected_race["id"]
-            existing_plan = plans.get(race_id, {})
-            
-            # AI Coach plan generation
-            if not existing_plan:
-                if st.button("🤖 Generate AI Coach Plan"):
-                    with st.spinner("AI Coach is creating your training plan..."):
-                        # Generate plan using OpenAI
-                        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-                        
-                        # Prepare recent run history for context
-                        recent_runs = df.sort_values("Date", ascending=False).head(10)
-                        run_history = recent_runs.to_string()
-                        
-                        # Calculate training period
-                        weeks_to_train = min(16, max(8, (race_date - today).days // 7))
-                        start_date = race_date - timedelta(weeks=weeks_to_train)
-                        
-                        prompt = f"""
-                        Create a {weeks_to_train} week running training plan for a {selected_race['distance']} km {selected_race['type']} race on {race_date}.
-                        
-                        Recent running history:
-                        {run_history}
-                        
-                        Create a structured training plan with:
-                        1. Weekly mileage gradually increasing then tapering before race
-                        2. Each day should specify distance in km and run type (easy, tempo, intervals, long, rest)
-                        3. Include weekly totals and brief comments on the focus for each week
-                        
-                        Format the response as JSON with structure:
-                        {{
-                            "weeks": [
-                                {{
-                                    "week_number": 1,
-                                    "start_date": "YYYY-MM-DD",
-                                    "monday": {{"distance": 5, "description": "Easy run"}},
-                                    "tuesday": {{"distance": 0, "description": "Rest"}},
-                                    "wednesday": {{"distance": 6, "description": "Tempo run"}},
-                                    "thursday": {{"distance": 0, "description": "Rest"}},
-                                    "friday": {{"distance": 5, "description": "Easy run"}},
-                                    "saturday": {{"distance": 0, "description": "Rest"}},
-                                    "sunday": {{"distance": 10, "description": "Long run"}},
-                                    "total_distance": 26,
-                                    "comment": "Base building week"
-                                }},
-                                // more weeks...
-                            ]
-                        }}
-                        """
-                        
-                        try:
-                            response = client.chat.completions.create(
-                                model="gpt-3.5-turbo-16k",
-                                messages=[
-                                    {"role": "system", "content": "You are an expert running coach who creates training plans for races."},
-                                    {"role": "user", "content": prompt}
-                                ],
-                                response_format={"type": "json_object"}
-                            )
-                            
-                            plan_json = response.choices[0].message.content
-                            plan_data = json.loads(plan_json)
-                            
-                            # Save the generated plan
-                            save_training_plan(race_id, plan_data)
-                            existing_plan = plan_data
-                            st.success("AI Coach has created your training plan!")
-                            st.rerun()
-                            
-                        except Exception as e:
-                            st.error(f"Error generating training plan: {e}")
-            
-            # Show and allow editing of the training plan
-            if existing_plan and "weeks" in existing_plan:
-                # Convert plan to DataFrame for display and editing
-                plan_data = []
-                for week in existing_plan["weeks"]:
-                    week_data = {
-                        "Week": f"Week {week['week_number']}",
-                        "Start Date": week.get("start_date", ""),
-                        "Monday": f"{week.get('monday', {}).get('distance', 0)} km: {week.get('monday', {}).get('description', '')}",
-                        "Tuesday": f"{week.get('tuesday', {}).get('distance', 0)} km: {week.get('tuesday', {}).get('description', '')}",
-                        "Wednesday": f"{week.get('wednesday', {}).get('distance', 0)} km: {week.get('wednesday', {}).get('description', '')}",
-                        "Thursday": f"{week.get('thursday', {}).get('distance', 0)} km: {week.get('thursday', {}).get('description', '')}",
-                        "Friday": f"{week.get('friday', {}).get('distance', 0)} km: {week.get('friday', {}).get('description', '')}",
-                        "Saturday": f"{week.get('saturday', {}).get('distance', 0)} km: {week.get('saturday', {}).get('description', '')}",
-                        "Sunday": f"{week.get('sunday', {}).get('distance', 0)} km: {week.get('sunday', {}).get('description', '')}",
-                        "Total": f"{week.get('total_distance', 0)} km",
-                        "Comment": week.get("comment", "")
-                    }
-                    plan_data.append(week_data)
-                
-                plan_df = pd.DataFrame(plan_data)
-                
-                # Use the Streamlit data editor for editing the plan
-                st.subheader("Training Schedule")
-                edited_df = st.data_editor(
-                    plan_df,
-                    use_container_width=True,
-                    hide_index=True,
-                    num_rows="fixed",
+
+    if not races:
+        st.info("No races added yet.")
+        return
+
+    st.subheader("Your Upcoming Races")
+    for i, race in enumerate(races):
+        race_date = datetime.fromisoformat(race["date"]).date()
+        days_until = (race_date - today).days
+        with st.container():
+            cols = st.columns([3, 1, 1])
+            with cols[0]:
+                st.markdown(f"### {race['name']}")
+                st.write(f"📅 {race_date} ({'in ' + str(days_until) + ' days' if days_until > 0 else 'Today!' if days_until == 0 else 'Completed'})")
+                st.write(f"🏃 {race['distance']} km | {race['type']}")
+                if race["notes"]:
+                    st.write(f"📝 {race['notes']}")
+            with cols[1]:
+                if st.button("🗑️ Delete", key=f"delete_{i}"):
+                    races.pop(i)
+                    save_races(races)
+                    st.rerun()
+            with cols[2]:
+                if st.button("📋 Training Plan", key=f"plan_{i}"):
+                    st.session_state["selected_race"] = race
+                    st.rerun()
+
+    st.markdown("---")
+
+    if "selected_race" in st.session_state:
+        selected_race = st.session_state["selected_race"]
+        race_date = datetime.fromisoformat(selected_race["date"]).date()
+        st.header(f"Training Plan: {selected_race['name']}")
+        st.write(f"Race Date: {race_date} | Distance: {selected_race['distance']} km")
+        plans = load_training_plans()
+        race_id = selected_race["id"]
+        existing_plan = plans.get(race_id, {})
+
+        if existing_plan and "weeks" in existing_plan:
+            plan_data = []
+            for week in existing_plan["weeks"]:
+                start_date = datetime.fromisoformat(week["start_date"]).date()
+                end_date = start_date + timedelta(days=6)
+                if end_date < today:
+                    status = "✅ Completed"
+                elif start_date <= today <= end_date:
+                    status = "⏳ Current"
+                else:
+                    status = "💤 Future"
+
+                week_data = {
+                    "Week": f"Week {week['week_number']}",
+                    "Start Date": start_date.strftime("%Y-%m-%d"),
+                    "Status": status,
+                    **{day: f"{week.get(day.lower(), {}).get('distance', 0)} km: {week.get(day.lower(), {}).get('description', '')}" for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]},
+                    "Total": f"{week.get('total_distance', 0)} km",
+                    "Comment": week.get("comment", "")
+                }
+                plan_data.append(week_data)
+
+            plan_df = pd.DataFrame(plan_data)
+
+            # Highlight today's cell and race day cell in the training schedule
+            def highlight_func(row):
+                # Only highlight the cell for today in the current week and the race day cell
+                styles = ['' for _ in row.index]
+                # Highlight today
+                start = datetime.strptime(row["Start Date"], "%Y-%m-%d").date()
+                end = start + timedelta(days=6)
+                if start <= today <= end:
+                    today_idx = today.weekday()
+                    day_col = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][today_idx]
+                    for idx, col in enumerate(row.index):
+                        if col == day_col:
+                            styles[idx] = 'background-color: #1EBEFF; color: #fff; font-weight: bold;'
+                # Highlight race day
+                if start <= race_date <= end:
+                    race_idx = race_date.weekday()
+                    race_col = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][race_idx]
+                    for idx, col in enumerate(row.index):
+                        if col == race_col:
+                            # Add icons and highlight
+                            val = row[col]
+                            # Add icons only if not already present
+                            if "🏁" not in str(val):
+                                row[col] = f"🏁🎉 {val} 🎉🏁"
+                            styles[idx] = 'background-color: #FFD700; color: #222; font-weight: bold;'
+                return styles
+
+            st.subheader("Training Schedule")
+            st.dataframe(
+                plan_df.style.apply(highlight_func, axis=1),
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # --- Chart with race label ---
+            chart_df = pd.DataFrame([
+                {
+                    "Week": row["Week"],
+                    "Planned": float(row["Total"].replace(" km", "")),
+                    "Actual": df[
+                        (df["Date"].dt.date >= datetime.strptime(row["Start Date"], "%Y-%m-%d").date()) &
+                        (df["Date"].dt.date <= datetime.strptime(row["Start Date"], "%Y-%m-%d").date() + timedelta(days=6))
+                    ]["Distance (km)"].sum() if "Distance (km)" in df.columns else 0,
+                    "Start Date": row["Start Date"]
+                }
+                for _, row in plan_df.iterrows()
+            ])
+
+            melted = chart_df.melt(id_vars=["Week", "Start Date"], var_name="Type", value_name="Distance")
+
+            # Find the race week (the week containing the race date)
+            race_week_idx = None
+            for idx, row in chart_df.iterrows():
+                start = datetime.strptime(row["Start Date"], "%Y-%m-%d").date()
+                end = start + timedelta(days=6)
+                if start <= race_date <= end:
+                    race_week_idx = idx
+                    break
+
+            # Create the base chart
+            chart = alt.Chart(melted).mark_area(line=True, point=True, interpolate='monotone', opacity=0.5).encode(
+                x=alt.X("Week:N"),
+                y=alt.Y("Distance:Q", title="Distance (km)", stack=None),
+                color=alt.Color("Type:N", scale=alt.Scale(domain=["Planned", "Actual"], range=["#1EBEFF", "#FF9633"]))
+            )
+
+            # Add a label for the race week on the planned line
+            if race_week_idx is not None:
+                race_week = chart_df.iloc[race_week_idx]["Week"]
+                race_distance = chart_df.iloc[race_week_idx]["Planned"]
+                # Determine if race day is exactly on the start date or within the week
+                is_exact_race_day = race_date == datetime.strptime(chart_df.iloc[race_week_idx]["Start Date"], "%Y-%m-%d").date()
+                label_text = "🏁 Race Day 🎉" if is_exact_race_day else "🏁 Race Week"
+                race_label = alt.Chart(pd.DataFrame({
+                    "Week": [race_week],
+                    "Distance": [race_distance],
+                    "label": [label_text]
+                })).mark_text(
+                    align='left', baseline='bottom', dx=10, dy=-10, fontSize=16, fontWeight="bold", color="#FFD700"
+                ).encode(
+                    x=alt.X("Week:N"),
+                    y=alt.Y("Distance:Q"),
+                    text="label:N"
                 )
-                
-                if st.button("Save Changes to Plan"):
-                    # Convert edited DataFrame back to plan structure
-                    updated_plan = {"weeks": []}
-                    for i, row in edited_df.iterrows():
-                        week_number = int(row["Week"].split(" ")[1])
-                        
-                        # Parse distance and description from each day
-                        days = {}
-                        for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]:
-                            parts = row[day].split("km:", 1)
-                            if len(parts) == 2:
-                                distance = float(parts[0].strip().replace("km", ""))
-                                description = parts[1].strip()
-                                days[day.lower()] = {"distance": distance, "description": description}
-                            else:
-                                days[day.lower()] = {"distance": 0, "description": "Rest"}
-                        
-                        # Calculate total distance
-                        total_distance = sum(day_data["distance"] for day_data in days.values())
-                        
-                        week_data = {
-                            "week_number": week_number,
-                            "start_date": row["Start Date"],
-                            **days,
-                            "total_distance": total_distance,
-                            "comment": row["Comment"]
-                        }
-                        updated_plan["weeks"].append(week_data)
-                    
-                    # Save the updated plan
-                    save_training_plan(race_id, updated_plan)
-                    st.success("Training plan updated!")
-                
-                # Plot planned vs actual weekly distance
-                st.subheader("Weekly Distance Comparison")
-                
-                # Create weekly planned distance data
-                weekly_data = []
-                for week in existing_plan["weeks"]:
-                    # Extract week start date and calculate end date
+                chart = chart + race_label
+
+            st.altair_chart(chart.properties(height=300), use_container_width=True)
+
+            with st.expander("🧠 AI Review of Your Progress Toward Race"):
+                if st.button("🔍 Analyze Progress with AI"):
+                    st.write('🧠 Sending request to OpenAI...')
+                    today_str = datetime.today().strftime("%Y-%m-%d")
+
+                    recent_runs = df.sort_values("Date", ascending=False).head(20)
+                    lap_data = []
+                    for _, row in recent_runs.iterrows():
+                        date = row["Date"].strftime("%Y-%m-%d")
+                        name = row.get("Name", "Unnamed Run")
+                        summary = (
+                            f"Run: {date} - {name}\n"
+                            f"Distance: {row.get('Distance (km)', '-'):.2f} km | "
+                            f"Pace: {row.get('Pace (min/km)', '-')} | "
+                            f"Time: {row.get('Moving Time', '-')} | "
+                            f"HR: {row.get('Avg HR', '-')} | Cadence: {row.get('Cadence', '-')} | "
+                            f"Elev Gain: {row.get('Elevation Gain', '-')}"
+                        )
+                        lap_details = row.get("Lap Details", "").strip()
+                        lap_data.append(summary + "\n" + lap_details)
+                    lap_text = "\n\n".join(lap_data)
+
+                    history = load_progress_feedback()
+                    race_history = history.get(race_id, [])
+                    previous_notes = "\n".join(f"- {item['feedback']}" for item in race_history[-2:])
+
+                    prompt = generate_ai_prompt(selected_race, today_str, race_date, plan_df, chart_df, lap_text, previous_notes)
+
                     try:
-                        start_date = datetime.fromisoformat(week.get("start_date")).date()
-                        end_date = start_date + timedelta(days=6)
-                        
-                        # Calculate actual distance from runs in this period
-                        actual_distance = df[(df["Date"].dt.date >= start_date) & 
-                                          (df["Date"].dt.date <= end_date)]["Distance (km)"].sum()
-                        
-                        weekly_data.append({
-                            "Week": f"Week {week['week_number']}",
-                            "Planned Distance": week.get("total_distance", 0),
-                            "Actual Distance": actual_distance
-                        })
-                    except:
-                        # Fallback if date parsing fails
-                        weekly_data.append({
-                            "Week": f"Week {week['week_number']}",
-                            "Planned Distance": week.get("total_distance", 0),
-                            "Actual Distance": 0
-                        })
-                
-                weekly_df = pd.DataFrame(weekly_data)
-                weekly_df = weekly_df.melt(id_vars=["Week"], 
-                                          value_vars=["Planned Distance", "Actual Distance"],
-                                          var_name="Type", value_name="Distance")
-                
-                # Create the chart
-                chart = alt.Chart(weekly_df).mark_area(line=True, point=True, interpolate='monotone', opacity=0.5).encode(
-                    x=alt.X("Week:N", sort=None),
-                    y=alt.Y("Distance:Q", title="Distance (km)", stack=None),
-                    color=alt.Color("Type:N", scale=alt.Scale(
-                        domain=["Planned Distance", "Actual Distance"],
-                        range=["#1EBEFF", "#FF9633"]
-                    ))
-                ).properties(height=300)
-                
-                st.altair_chart(chart, use_container_width=True)
-                
-                # Option to delete plan
-                if st.button("🗑️ Delete Training Plan"):
-                    plans = load_training_plans()
-                    if race_id in plans:
-                        del plans[race_id]
-                        with open("data/races/training_plans.json", "w") as f:
-                            json.dump(plans, f)
-                        st.success("Training plan deleted.")
-                        if "selected_race" in st.session_state:
-                            del st.session_state["selected_race"]
-                        st.rerun()
-            else:
-                st.info("No training plan exists yet. Use the AI Coach to create one, or add one manually.")
-                
-                # Option to add plan manually
-                with st.expander("Create Manual Training Plan"):
-                    # Calculate number of weeks until race
-                    weeks_to_race = max(1, (race_date - today).days // 7)
-                    num_weeks = st.slider("Number of weeks in plan", 4, 24, min(16, weeks_to_race))
-                    
-                    # Create a template for the manual plan
-                    manual_plan = {"weeks": []}
-                    for i in range(num_weeks):
-                        week_start = today + timedelta(weeks=i)
-                        manual_plan["weeks"].append({
-                            "week_number": i + 1,
-                            "start_date": week_start.isoformat(),
-                            "monday": {"distance": 0, "description": "Rest"},
-                            "tuesday": {"distance": 0, "description": "Rest"},
-                            "wednesday": {"distance": 0, "description": "Rest"},
-                            "thursday": {"distance": 0, "description": "Rest"},
-                            "friday": {"distance": 0, "description": "Rest"},
-                            "saturday": {"distance": 0, "description": "Rest"},
-                            "sunday": {"distance": 0, "description": "Rest"},
-                            "total_distance": 0,
-                            "comment": f"Week {i + 1}"
-                        })
-                    
-                    if st.button("Create Empty Plan Template"):
-                        save_training_plan(race_id, manual_plan)
-                        st.success("Empty training plan template created!")
-                        st.rerun()
-    else:
-        st.info("No races added yet. Add your first race using the form above.")
+                        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+                        response = client.chat.completions.create(
+                            model="gpt-4-turbo",
+                            messages=[
+                                {"role": "system", "content": "You are a professional running coach offering insights."},
+                                {"role": "user", "content": prompt}
+                            ]
+                        )
+                        feedback = response.choices[0].message.content
+                        st.success("✅ Feedback received:")
+                        st.markdown(f"""<div style='padding:12px; background:#1c1c1e; border-radius:10px; line-height:1.6; font-size:0.95rem;'>{feedback}</div>""", unsafe_allow_html=True)
+                        save_progress_feedback(race_id, {"date": today_str, "feedback": feedback})
+                        st.session_state['last_ai_feedback'] = feedback
+                    except Exception as e:
+                        st.error(f"Failed to analyze progress: {e}")
+
+                render_feedback_history(race_id)
