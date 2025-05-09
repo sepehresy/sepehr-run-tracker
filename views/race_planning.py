@@ -2,56 +2,60 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import datetime, timedelta
-import json
-import os
 from openai import OpenAI
-from views.ai_prompt import generate_ai_prompt
-
-# from app import load_gist_data, save_gist_data  # <-- Add this line
+from views.ai_prompt import generate_ai_prompt, generate_ai_plan_prompt
 from utils.gist_helpers import load_gist_data, save_gist_data
+import openai
+from utils.gsheet import fetch_gsheet_plan
+from utils.parse_helper import parse_markdown_plan_table, parse_csv_plan_table, load_csv_from_text
 
-USER_KEY = "sepehr"  # Later, make this dynamic per user
-
-def load_gist_race_data():
-    data = load_gist_data()
-    if USER_KEY not in data:
-        data[USER_KEY] = {"races": [], "training_plans": {}, "progress_feedback": {}}
+def load_gist_race_data(user_info, gist_id, filename, token):
+    data = load_gist_data(gist_id, filename, token)
+    user_key = user_info["USER_KEY"]
+    if user_key not in data:
+        data[user_key] = {"races": [], "training_plans": {}, "progress_feedback": {}}
     return data
 
-def save_gist_race_data(data):
-    return save_gist_data(data)
+def save_gist_race_data(data, user_info, gist_id, filename, token):
+    return save_gist_data(gist_id, filename, token, data)
 
-def load_saved_races():
-    data = load_gist_race_data()
-    return data[USER_KEY].get("races", [])
+def load_saved_races(user_info, gist_id, filename, token):
+    data = load_gist_race_data(user_info, gist_id, filename, token)
+    user_key = user_info["USER_KEY"]
+    return data[user_key].get("races", [])
 
-def save_races(races):
-    data = load_gist_race_data()
-    data[USER_KEY]["races"] = races
-    return save_gist_race_data(data)
+def save_races(races, user_info, gist_id, filename, token):
+    data = load_gist_race_data(user_info, gist_id, filename, token)
+    user_key = user_info["USER_KEY"]
+    data[user_key]["races"] = races
+    return save_gist_race_data(data, user_info, gist_id, filename, token)
 
-def load_training_plans():
-    data = load_gist_race_data()
-    return data[USER_KEY].get("training_plans", {})
+def load_training_plans(user_info, gist_id, filename, token):
+    data = load_gist_race_data(user_info, gist_id, filename, token)
+    user_key = user_info["USER_KEY"]
+    return data[user_key].get("training_plans", {})
 
-def save_training_plan(race_id, plan):
-    data = load_gist_race_data()
-    data[USER_KEY].setdefault("training_plans", {})
-    data[USER_KEY]["training_plans"][race_id] = plan
-    return save_gist_race_data(data)
+def save_training_plan(race_id, plan, user_info, gist_id, filename, token):
+    data = load_gist_race_data(user_info, gist_id, filename, token)
+    user_key = user_info["USER_KEY"]
+    data[user_key].setdefault("training_plans", {})
+    data[user_key]["training_plans"][race_id] = plan
+    return save_gist_race_data(data, user_info, gist_id, filename, token)
 
-def load_progress_feedback():
-    data = load_gist_race_data()
-    return data[USER_KEY].get("progress_feedback", {})
+def load_progress_feedback(user_info, gist_id, filename, token):
+    data = load_gist_race_data(user_info, gist_id, filename, token)
+    user_key = user_info["USER_KEY"]
+    return data[user_key].get("progress_feedback", {})
 
-def save_progress_feedback(race_id, entry):
-    data = load_gist_race_data()
-    data[USER_KEY].setdefault("progress_feedback", {})
-    data[USER_KEY]["progress_feedback"].setdefault(race_id, []).append(entry)
-    return save_gist_race_data(data)
+def save_progress_feedback(race_id, entry, user_info, gist_id, filename, token):
+    data = load_gist_race_data(user_info, gist_id, filename, token)
+    user_key = user_info["USER_KEY"]
+    data[user_key].setdefault("progress_feedback", {})
+    data[user_key]["progress_feedback"].setdefault(race_id, []).append(entry)
+    return save_gist_race_data(data, user_info, gist_id, filename, token)
 
-def render_feedback_history(race_id):
-    race_history = load_progress_feedback().get(race_id, [])
+def render_feedback_history(race_id, user_info, gist_id, filename, token):
+    race_history = load_progress_feedback(user_info, gist_id, filename, token).get(race_id, [])
     if race_history:
         st.markdown("""
         <style>
@@ -120,7 +124,6 @@ def render_feedback_history(race_id):
         st.markdown("### 🕓 AI Feedback History")
         for i, item in enumerate(reversed(race_history)):
             feedback_key = f"{race_id}_feedback_{len(race_history)-1-i}"
-            # Use columns to align the button with the summary (Streamlit only)
             cols = st.columns([0.88, 0.12])
             with cols[0]:
                 st.markdown(f"""
@@ -138,242 +141,447 @@ def render_feedback_history(race_id):
             with cols[1]:
                 remove_btn = st.button("🗑️", key=f"remove_{feedback_key}", help="Delete this feedback")
                 if remove_btn:
-                    all_history = load_progress_feedback()
+                    all_history = load_progress_feedback(user_info, gist_id, filename, token)
                     feedback_list = all_history.get(race_id, [])
                     del feedback_list[len(feedback_list)-1-i]
                     all_history[race_id] = feedback_list
-                    save_progress_feedback(race_id, feedback_list)
+                    save_progress_feedback(race_id, feedback_list, user_info, gist_id, filename, token)
                     st.success("Feedback removed.")
                     st.rerun()
 
-def render_race_planning(df, today):
+def render_race_planning(df, today, user_info, gist_id, gist_filename, github_token):
+    user_key = user_info["USER_KEY"]
+    gist_id = user_info["GIST_ID"]
+    filename = f"{user_key}.json"
+    token = github_token
+
     if isinstance(today, datetime):
         today = today.date()
+    if "race_edit_state" not in st.session_state:
+        st.session_state["race_edit_state"] = {}
+    if "plan_edit_buffer" not in st.session_state:
+        st.session_state["plan_edit_buffer"] = {}
+    if "plan_edit_meta" not in st.session_state:
+        st.session_state["plan_edit_meta"] = {}
 
-    # Ensure df["Date"] is datetime
-    if "Date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["Date"]):
-        df["Date"] = pd.to_datetime(df["Date"])
+    st.markdown("""
+    <style>
+    .race-section {border-radius: 14px; margin-bottom: 28px; background: #fff; box-shadow: 0 2px 16px rgba(30,40,60,0.07); border: 1px solid #e6e6e6;}
+    .race-header {padding: 20px 28px; font-size: 1.3rem; font-weight: 600; color: #1EBEFF; background: #f7fafd; border-radius: 14px 14px 0 0; letter-spacing: 0.5px;}
+    .race-meta {color: #888; font-size: 1.05rem; margin-bottom: 8px;}
+    .race-actions {margin-top: 8px;}
+    .race-divider {border-bottom: 1px solid #f0f0f0; margin: 0 0 18px 0;}
+    .plan-toolbar {margin-bottom: 18px;}
+    .plan-toolbar .stButton>button {margin-right: 12px;}
+    .plan-table {margin-bottom: 18px;}
+    .stButton>button {border-radius: 8px !important; background: #1EBEFF !important; color: #fff !important; border: none !important; font-weight: 500; padding: 8px 18px; transition: background 0.2s;}
+    .stButton>button:hover {background: #009fd9 !important;}
+    .stTextInput>div>input, .stNumberInput>div>input, .stTextArea textarea, .stSelectbox>div>div {
+        border-radius: 8px; border: 1px solid #e6e6e6; background: #23242a !important; color: #e6e6e6 !important; font-size: 1rem;
+    }
+    .stDataFrame, .stDataEditor {background: #f7fafd; border-radius: 10px;}
+    .stExpanderHeader {font-size: 1.1rem; font-weight: 500; color: #1EBEFF;}
+    .stAlert {border-radius: 8px;}
+    </style>
+    """, unsafe_allow_html=True)
 
-    st.title("🏁 Race Planning")
-    races = load_saved_races()
+    st.markdown("""
+    <div style='display:flex;align-items:center;gap:12px;margin-bottom:18px;'>
+        <span style='font-size:2.1rem;'>🏁</span>
+        <span style='font-size:1.7rem;font-weight:600;letter-spacing:0.5px;color:#222;'>Race Planning</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-    with st.expander("➕ Add a New Race", expanded=len(races) == 0):
+    if "add_race_expanded" not in st.session_state:
+        st.session_state["add_race_expanded"] = False
+    else:
+        st.session_state["add_race_expanded"] = False
+    races = load_saved_races(user_info, gist_id, filename, token)
+    plans = load_training_plans(user_info, gist_id, filename, token)
+
+    ai_enabled = False
+    # Features can be in 'Features' or 'features' depending on secrets.toml
+    features = user_info.get('Features', []) or user_info.get('features', [])
+    # print (user_info,features)
+    if isinstance(features, str):
+        import json
+        try:
+            features = json.loads(features)
+        except Exception:
+            features = []
+    ai_enabled = 'ai' in features
+
+    with st.expander("➕ Add New Race", expanded=st.session_state["add_race_expanded"]):
         with st.form("add_race_form"):
-            col1, col2 = st.columns(2)
+            col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([1.2,1,1,1,1,1,1,2])
             with col1:
-                race_name = st.text_input("Race Name")
-                race_date = st.date_input("Race Date", min_value=today)
+                race_name = st.text_input("Race Name", placeholder="e.g. Berlin Marathon")
             with col2:
-                race_distance = st.number_input("Distance (km)", min_value=1.0, step=0.1)
-                race_type = st.selectbox("Race Type", ["Road", "Trail", "Track", "Virtual"])
-            notes = st.text_area("Race Notes (optional)")
-            if st.form_submit_button("Save Race") and race_name:
-                new_race = {
-                    "id": f"race_{len(races)+1}",
-                    "name": race_name,
-                    "date": race_date.isoformat(),
-                    "distance": race_distance,
-                    "type": race_type,
-                    "notes": notes,
-                    "created_at": datetime.now().isoformat()
-                }
-                races.append(new_race)
-                if save_races(races):
-                    st.success(f"Race '{race_name}' added.")
+                goal_time = st.text_input("Goal Time (e.g., 3:45:00)", placeholder="3:45:00")
+            with col3:
+                race_date = st.date_input("Race Date", value=today)
+            with col4:
+                race_distance = st.number_input("Distance (km)", min_value=1.0, step=0.1, placeholder="42.2")
+            with col5:
+                start_date = st.date_input("Training Start Date", value=today)
+            with col6:
+                race_type = st.selectbox("Race Type", ["Road", "Trail", "Track", "Virtual"], index=0)
+            with col7:
+                elevation_gain = st.number_input("Elevation Gain (m)", min_value=0.0, step=10.0, placeholder="0")
+            with col8:
+                notes = st.text_area("Notes (optional)", placeholder="Add any notes or goals...", height=70)
+            submit = st.form_submit_button("Create Race")
+            
+            if submit:
+                st.session_state["add_race_expanded"] = False
+                if any(r["name"].strip().lower() == race_name.strip().lower() for r in races):
+                    st.error("A race with this name already exists. Please choose a different name.")
+                else:
+                    plan_start_date = start_date - timedelta(days=start_date.weekday())
+                    plan_race_date = race_date
+                    plan_race_week_start = plan_race_date - timedelta(days=plan_race_date.weekday())
+                    num_weeks = max(1, ((plan_race_week_start - plan_start_date).days // 7) + 1)
+                    weeks = []
+                    for w in range(num_weeks):
+                        week_start = plan_start_date + timedelta(days=7*w)
+                        week = {
+                            "week_number": w+1,
+                            "start_date": week_start.strftime("%Y-%m-%d"),
+                            "status": "💤 Future",
+                            "monday": {"distance": 0.0, "description": "Rest"},
+                            "tuesday": {"distance": 0.0, "description": "Rest"},
+                            "wednesday": {"distance": 0.0, "description": "Rest"},
+                            "thursday": {"distance": 0.0, "description": "Rest"},
+                            "friday": {"distance": 0.0, "description": "Rest"},
+                            "saturday": {"distance": 0.0, "description": "Rest"},
+                            "sunday": {"distance": 0.0, "description": "Rest"},
+                            "comment": ""
+                        }
+                        if week_start == plan_race_week_start:
+                            race_week_idx = plan_race_date.weekday()
+                            day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                            week[day_names[race_week_idx]] = {"distance": race_distance, "description": "Race day"}
+                        weeks.append(week)
+                    new_race = {
+                        "id": f"race_{len(races)+1}",
+                        "name": race_name,
+                        "date": race_date.isoformat(),
+                        "distance": race_distance,
+                        "type": race_type,
+                        "elevation_gain": elevation_gain,
+                        "goal_time": goal_time,
+                        "notes": notes,
+                        "created_at": datetime.now().isoformat(),
+                        "runner_profile": {
+                            "experience": "",
+                            "weekly_km": 0.0,
+                            "training_start_date": start_date.isoformat(),
+                            "recent_race": "",
+                            "goal_time": goal_time,
+                            "available_days": [],
+                            "limitations": "",
+                            "preferred_workout_types": "",
+                            "other_notes": ""
+                        }
+                    }
+                    races.insert(0, new_race)
+                    save_races(races, user_info, gist_id, filename, token)
+                    plans = load_training_plans(user_info, gist_id, filename, token)
+                    plans[new_race["id"]] = {"weeks": weeks}
+                    save_training_plan(new_race["id"], {"weeks": weeks}, user_info, gist_id, filename, token)
+                    st.success(f"Race '{race_name}' created!")
+                    st.session_state["add_race_expanded"] = False
                     st.rerun()
 
     if not races:
-        st.info("No races added yet.")
+        st.info("No races added yet. Add a race to get started.")
         return
 
-    st.subheader("Your Upcoming Races")
+    DEBUG_AI_PLAN_PATH = "data/analyses/ai_plan_debug.txt"
+
     for i, race in enumerate(races):
-        race_date = datetime.fromisoformat(race["date"]).date()
-        days_until = (race_date - today).days
-        with st.container():
-            cols = st.columns([3, 1, 1])
-            with cols[0]:
-                st.markdown(f"### {race['name']}")
-                st.write(f"📅 {race_date} ({'in ' + str(days_until) + ' days' if days_until > 0 else 'Today!' if days_until == 0 else 'Completed'})")
-                st.write(f"🏃 {race['distance']} km | {race['type']}")
-                if race["notes"]:
-                    st.write(f"📝 {race['notes']}")
-            with cols[1]:
-                if st.button("🗑️ Delete", key=f"delete_{i}"):
-                    races.pop(i)
-                    save_races(races)
+        try:
+            race_id = race.get("id", f"race_{i+1}")
+            plan = plans.get(race_id, {})
+            expanded = st.session_state["race_edit_state"].get(race_id, False)
+            with st.container():
+                race_header_col, delete_col = st.columns([0.93, 0.07])
+                with race_header_col:
+                    exp_label = f"🏁 {race.get('name', 'Unnamed Race')} ({race.get('date', '-')})"
+                with delete_col:
+                    delete_btn = st.button("🗑️", key=f"delete_race_{race_id}", help="Delete this race")
+                if delete_btn:
+                    races = [r for r in races if r.get("id") != race_id]
+                    save_races(races, user_info, gist_id, filename, token)
+                    st.success("Race deleted.")
                     st.rerun()
-            with cols[2]:
-                if st.button("📋 Training Plan", key=f"plan_{i}"):
-                    st.session_state["selected_race"] = race
-                    st.rerun()
+                with st.expander(exp_label, expanded=expanded):
+                    st.session_state["race_edit_state"][race_id] = expanded
+                    col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([1.2,1,1,1,1,1,1,2])
+                    with col1:
+                        race_name = st.text_input("Race Name", value=race.get("name", ""), key=f"name_{race_id}")
+                    with col2:
+                        start_date = st.date_input("Start", value=pd.to_datetime(race.get("runner_profile", {}).get("training_start_date", race.get("date", today))), key=f"start_{race_id}")
+                    with col3:
+                        race_date = st.date_input("Race", value=pd.to_datetime(race.get("date", today)), key=f"date_{race_id}")
+                    with col4:
+                        race_distance = st.number_input("Dist (km)", min_value=1.0, step=0.1, value=float(race.get("distance", 0)), key=f"dist_{race_id}")
+                    with col5:
+                        race_type = st.selectbox("Type", ["Road", "Trail", "Track", "Virtual"], index=["Road", "Trail", "Track", "Virtual"].index(race.get("type", "Road")), key=f"type_{race_id}")
+                    with col6:
+                        elevation_gain = st.number_input("Elev (m)", min_value=0.0, step=10.0, value=float(race.get("elevation_gain", 0)), key=f"elev_{race_id}")
+                    with col7:
+                        goal_time = st.text_input("Goal Time", value=race.get("goal_time", ""), key=f"goal_{race_id}")
+                    with col8:
+                        notes = st.text_area("Notes", value=race.get("notes", ""), key=f"notes_{race_id}", height=70)
+                    b1, b2, b3 = st.columns([1,1,1])
+                    if b1.button("Save Race Info", key=f"save_raceinfo_{race_id}"):
+                        race["name"] = race_name
+                        race["date"] = race_date.isoformat()
+                        race["distance"] = race_distance
+                        race["type"] = race_type
+                        race["elevation_gain"] = elevation_gain
+                        race["goal_time"] = goal_time
+                        race["notes"] = notes
+                        if "runner_profile" not in race or not isinstance(race["runner_profile"], dict):
+                            race["runner_profile"] = {}
+                        race["runner_profile"]["training_start_date"] = start_date.isoformat()
+                        race["runner_profile"]["goal_time"] = goal_time
+                        save_races(races, user_info, gist_id, filename, token)
+                        st.success("Race info updated.")
+                    # --- AI Plan Button ---
+                    if ai_enabled:
+                        if b2.button("AI Plan", key=f"ai_plan_btn_{race_id}"):
+                            st.session_state[f"ai_plan_mode_{race_id}"] = True
+                    else:
+                        st.button("AI Plan (Locked)", key=f"ai_plan_btn_{race_id}", disabled=True, help="You do not have access to AI features.")
+                    if st.session_state.get(f"ai_plan_mode_{race_id}", False):
+                        st.info("Enter extra notes for the AI prompt (optional):")
+                        ai_note = st.text_area("AI Notes", key=f"ai_note_{race_id}")
+                        c1, c2 = st.columns([1,1])
+                        if c1.button("Send to AI", key=f"send_ai_{race_id}"):
+                            from views.ai_prompt import generate_ai_plan_prompt
+                            prompt = generate_ai_plan_prompt(race, ai_note)
+                            try:
+                                debug_mode = True
+                                if debug_mode:
+                                    with open(DEBUG_AI_PLAN_PATH, 'r', encoding='utf-8') as f:
+                                        ai_table_md = f.read().strip()
+                                        if ai_table_md.startswith("'") and ai_table_md.endswith("'"):
+                                            ai_table_md = ai_table_md[1:-1]
+                                        ai_table_md = ai_table_md.replace("\\n", "\n")
+                                else:
+                                    client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+                                    response = client.chat.completions.create(
+                                        model="gpt-4-turbo",
+                                        messages=[
+                                            {"role": "system", "content": "You are a professional running coach."},
+                                            {"role": "user", "content": prompt}
+                                        ]
+                                    )
+                                    ai_table_md = response.choices[0].message.content
+                                df = parse_csv_plan_table(ai_table_md)
+                                required_cols = ["Week", "Start Date", "Status", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Comment"]
+                                if df is None or not all(col in df.columns for col in required_cols):
+                                    st.error("AI plan table format is invalid. Please try again or edit manually.")
+                                else:
+                                    new_weeks = []
+                                    for _, row in df.iterrows():
+                                        week = {
+                                            "week_number": int(str(row["Week"]).replace("Week ", "").strip()) if str(row["Week"]).replace("Week ", "").strip().isdigit() else row["Week"],
+                                            "start_date": str(row["Start Date"]),
+                                            "status": row["Status"],
+                                            "monday": _parse_day_cell(row["Monday"]),
+                                            "tuesday": _parse_day_cell(row["Tuesday"]),
+                                            "wednesday": _parse_day_cell(row["Wednesday"]),
+                                            "thursday": _parse_day_cell(row["Thursday"]),
+                                            "friday": _parse_day_cell(row["Friday"]),
+                                            "saturday": _parse_day_cell(row["Saturday"]),
+                                            "sunday": _parse_day_cell(row["Sunday"]),
+                                            "comment": row["Comment"]
+                                        }
+                                        week["total_distance"] = sum([
+                                            week[day]["distance"] for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                                        ])
+                                        new_weeks.append(week)
+                                    st.session_state[f"plan_buffer_{race_id}"] = new_weeks
+                                    st.success("AI plan loaded. Don't forget to Save Plan to keep changes.")
+                                    st.session_state[f"ai_plan_mode_{race_id}"] = False
+                            except Exception as e:
+                                st.error(f"AI error: {e}")
+                        if c2.button("Cancel", key=f"cancel_ai_{race_id}"):
+                            st.session_state[f"ai_plan_mode_{race_id}"] = False
+                    if b3.button("Google Sheet Plan", key=f"gsheet_btn_{race_id}"):
+                        st.session_state[f"gsheet_mode_{race_id}"] = True
+                    if st.session_state.get(f"gsheet_mode_{race_id}", False):
+                        st.info("Enter Google Sheet URL:")
+                        gsheet_url = st.text_input("Google Sheet URL", key=f"gsheet_url_{race_id}")
+                        c1, c2 = st.columns([1,1])
+                        if c1.button("Fetch Plan", key=f"fetch_gsheet_{race_id}"):
+                            from utils.gsheet import fetch_gsheet_plan
+                            gsheet_df = fetch_gsheet_plan(gsheet_url)
+                            # print (gsheet_url, gsheet_df)
+                            if gsheet_df is not None:
+                                required_cols = ["Week", "Start Date", "Status", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Comment"]
+                                if not all(col in gsheet_df.columns for col in required_cols):
+                                    st.error("Google Sheet plan format is invalid. Please use the template.")
+                                else:
+                                    new_weeks = []
+                                    for _, row in gsheet_df.iterrows():
+                                        week = {
+                                            "week_number": int(str(row["Week"]).replace("Week ", "").strip()),
+                                            "start_date": str(row["Start Date"]),
+                                            "status": row["Status"],
+                                            "monday": _parse_day_cell(row["Monday"]),
+                                            "tuesday": _parse_day_cell(row["Tuesday"]),
+                                            "wednesday": _parse_day_cell(row["Wednesday"]),
+                                            "thursday": _parse_day_cell(row["Thursday"]),
+                                            "friday": _parse_day_cell(row["Friday"]),
+                                            "saturday": _parse_day_cell(row["Saturday"]),
+                                            "sunday": _parse_day_cell(row["Sunday"]),
+                                            "comment": row["Comment"]
+                                        }
+                                        week["total_distance"] = sum([
+                                            week[day]["distance"] for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                                        ])
+                                        new_weeks.append(week)
+                                    st.session_state[f"plan_buffer_{race_id}"] = new_weeks
+                                    st.success("Google Sheet plan loaded. Don't forget to Save Plan to keep changes.")
+                                    st.session_state[f"gsheet_mode_{race_id}"] = False
+                        if c2.button("Cancel", key=f"cancel_gsheet_{race_id}"):
+                            st.session_state[f"gsheet_mode_{race_id}"] = False
 
-    st.markdown("---")
+                    weeks = st.session_state.get(f"plan_buffer_{race_id}", plan.get("weeks", []))
+                    for w in weeks:
+                        w.setdefault("status", "💤 Future")
+                        w.setdefault("monday", {"distance": 0.0, "description": "Rest"})
+                        w.setdefault("tuesday", {"distance": 0.0, "description": "Rest"})
+                        w.setdefault("wednesday", {"distance": 0.0, "description": "Rest"})
+                        w.setdefault("thursday", {"distance": 0.0, "description": "Rest"})
+                        w.setdefault("friday", {"distance": 0.0, "description": "Rest"})
+                        w.setdefault("saturday", {"distance": 0.0, "description": "Rest"})
+                        w.setdefault("sunday", {"distance": 0.0, "description": "Rest"})
+                        w.setdefault("comment", "")
+                    plan_df = pd.DataFrame([
+                        {
+                            "Week": f"Week {w.get('week_number', idx+1)}",
+                            "Start Date": w.get("start_date", ""),
+                            "Status": w.get("status", "💤 Future"),
+                            "Monday": f"{w.get('monday', {}).get('distance', 0)} km: {w.get('monday', {}).get('description', '')}",
+                            "Tuesday": f"{w.get('tuesday', {}).get('distance', 0)} km: {w.get('tuesday', {}).get('description', '')}",
+                            "Wednesday": f"{w.get('wednesday', {}).get('distance', 0)} km: {w.get('wednesday', {}).get('description', '')}",
+                            "Thursday": f"{w.get('thursday', {}).get('distance', 0)} km: {w.get('thursday', {}).get('description', '')}",
+                            "Friday": f"{w.get('friday', {}).get('distance', 0)} km: {w.get('friday', {}).get('description', '')}",
+                            "Saturday": f"{w.get('saturday', {}).get('distance', 0)} km: {w.get('saturday', {}).get('description', '')}",
+                            "Sunday": f"{w.get('sunday', {}).get('distance', 0)} km: {w.get('sunday', {}).get('description', '')}",
+                            "Comment": w.get("comment", "")
+                        }
+                        for idx, w in enumerate(weeks)
+                    ])
+                    total_col = []
+                    for idx, row in plan_df.iterrows():
+                        week_total = 0.0
+                        for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]:
+                            try:
+                                dist, _ = str(row[day]).split(" km:", 1)
+                                week_total += float(dist.strip())
+                            except Exception:
+                                pass
+                        total_col.append(f"{week_total:.1f} km")
+                    plan_df["Total"] = total_col
+                    edited = st.data_editor(
+                        plan_df,
+                        num_rows="dynamic",
+                        use_container_width=True,
+                        disabled=["Total"],
+                        key=f"manual_plan_editor_{race_id}_always"
+                    )
+                    if st.button("💾 Save Plan", key=f"save_plan_{race_id}_always"):
+                        for idx, row in edited.iterrows():
+                            for d, day in enumerate(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]):
+                                try:
+                                    dist, desc = str(row[day.capitalize()]).split(" km:", 1)
+                                    weeks[idx][day] = {"distance": float(dist.strip()), "description": desc.strip()}
+                                except Exception:
+                                    weeks[idx][day] = {"distance": 0.0, "description": str(row[day.capitalize()])}
+                            weeks[idx]["total_distance"] = sum([
+                                weeks[idx].get(day, {}).get("distance", 0.0)
+                                for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                            ])
+                            weeks[idx]["comment"] = row["Comment"]
+                        save_training_plan(race_id, {"weeks": weeks}, user_info, gist_id, filename, token)
+                        st.success("Training plan saved!")
+                        st.rerun()
 
-    if "selected_race" in st.session_state:
-        selected_race = st.session_state["selected_race"]
-        race_date = datetime.fromisoformat(selected_race["date"]).date()
-        st.header(f"Training Plan: {selected_race['name']}")
-        st.write(f"Race Date: {race_date} | Distance: {selected_race['distance']} km")
-        plans = load_training_plans()
-        race_id = selected_race["id"]
-        existing_plan = plans.get(race_id, {})
-
-        if existing_plan and "weeks" in existing_plan:
-            plan_data = []
-            for week in existing_plan["weeks"]:
-                start_date = datetime.fromisoformat(week["start_date"]).date()
-                end_date = start_date + timedelta(days=6)
-                if end_date < today:
-                    status = "✅ Completed"
-                elif start_date <= today <= end_date:
-                    status = "⏳ Current"
-                else:
-                    status = "💤 Future"
-
-                week_data = {
-                    "Week": f"Week {week['week_number']}",
-                    "Start Date": start_date.strftime("%Y-%m-%d"),
-                    "Status": status,
-                    **{day: f"{week.get(day.lower(), {}).get('distance', 0)} km: {week.get(day.lower(), {}).get('description', '')}" for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]},
-                    "Total": f"{week.get('total_distance', 0)} km",
-                    "Comment": week.get("comment", "")
-                }
-                plan_data.append(week_data)
-
-            plan_df = pd.DataFrame(plan_data)
-
-            # Highlight today's cell and race day cell in the training schedule
-            def highlight_func(row):
-                # Only highlight the cell for today in the current week and the race day cell
-                styles = ['' for _ in row.index]
-                # Highlight today
-                start = datetime.strptime(row["Start Date"], "%Y-%m-%d").date()
-                end = start + timedelta(days=6)
-                if start <= today <= end:
-                    today_idx = today.weekday()
-                    day_col = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][today_idx]
-                    for idx, col in enumerate(row.index):
-                        if col == day_col:
-                            styles[idx] = 'background-color: #1EBEFF; color: #fff; font-weight: bold;'
-                # Highlight race day
-                if start <= race_date <= end:
-                    race_idx = race_date.weekday()
-                    race_col = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][race_idx]
-                    for idx, col in enumerate(row.index):
-                        if col == race_col:
-                            # Add icons and highlight
-                            val = row[col]
-                            # Add icons only if not already present
-                            if "🏁" not in str(val):
-                                row[col] = f"🏁🎉 {val} 🎉🏁"
-                            styles[idx] = 'background-color: #FFD700; color: #222; font-weight: bold;'
-                return styles
-
-            st.subheader("Training Schedule")
-            st.dataframe(
-                plan_df.style.apply(highlight_func, axis=1),
-                use_container_width=True,
-                hide_index=True
-            )
-
-            # --- Chart with race label ---
-            chart_df = pd.DataFrame([
-                {
-                    "Week": row["Week"],
-                    "Planned": float(row["Total"].replace(" km", "")),
-                    "Actual": df[
-                        (df["Date"].dt.date >= datetime.strptime(row["Start Date"], "%Y-%m-%d").date()) &
-                        (df["Date"].dt.date <= datetime.strptime(row["Start Date"], "%Y-%m-%d").date() + timedelta(days=6))
-                    ]["Distance (km)"].sum() if "Distance (km)" in df.columns else 0,
-                    "Start Date": row["Start Date"]
-                }
-                for _, row in plan_df.iterrows()
-            ])
-
-            melted = chart_df.melt(id_vars=["Week", "Start Date"], var_name="Type", value_name="Distance")
-
-            # Find the race week (the week containing the race date)
-            race_week_idx = None
-            for idx, row in chart_df.iterrows():
-                start = datetime.strptime(row["Start Date"], "%Y-%m-%d").date()
-                end = start + timedelta(days=6)
-                if start <= race_date <= end:
-                    race_week_idx = idx
-                    break
-
-            # Create the base chart
-            chart = alt.Chart(melted).mark_area(line=True, point=True, interpolate='monotone', opacity=0.5).encode(
-                x=alt.X("Week:N"),
-                y=alt.Y("Distance:Q", title="Distance (km)", stack=None),
-                color=alt.Color("Type:N", scale=alt.Scale(domain=["Planned", "Actual"], range=["#1EBEFF", "#FF9633"]))
-            )
-
-            # Add a label for the race week on the planned line
-            if race_week_idx is not None:
-                race_week = chart_df.iloc[race_week_idx]["Week"]
-                race_distance = chart_df.iloc[race_week_idx]["Planned"]
-                # Determine if race day is exactly on the start date or within the week
-                is_exact_race_day = race_date == datetime.strptime(chart_df.iloc[race_week_idx]["Start Date"], "%Y-%m-%d").date()
-                label_text = "🏁 Race Day 🎉" if is_exact_race_day else "🏁 Race Week"
-                race_label = alt.Chart(pd.DataFrame({
-                    "Week": [race_week],
-                    "Distance": [race_distance],
-                    "label": [label_text]
-                })).mark_text(
-                    align='left', baseline='bottom', dx=10, dy=-10, fontSize=16, fontWeight="bold", color="#FFD700"
-                ).encode(
-                    x=alt.X("Week:N"),
-                    y=alt.Y("Distance:Q"),
-                    text="label:N"
-                )
-                chart = chart + race_label
-
-            st.altair_chart(chart.properties(height=300), use_container_width=True)
-
-            with st.expander("🧠 AI Review of Your Progress Toward Race"):
-                if st.button("🔍 Analyze Progress with AI"):
-                    st.write('🧠 Sending request to OpenAI...')
-                    today_str = datetime.today().strftime("%Y-%m-%d")
-
-                    recent_runs = df.sort_values("Date", ascending=False).head(20)
-                    lap_data = []
-                    for _, row in recent_runs.iterrows():
-                        date = row["Date"].strftime("%Y-%m-%d")
-                        name = row.get("Name", "Unnamed Run")
-                        summary = (
-                            f"Run: {date} - {name}\n"
-                            f"Distance: {row.get('Distance (km)', '-'):.2f} km | "
-                            f"Pace: {row.get('Pace (min/km)', '-')} | "
-                            f"Time: {row.get('Moving Time', '-')} | "
-                            f"HR: {row.get('Avg HR', '-')} | Cadence: {row.get('Cadence', '-')} | "
-                            f"Elev Gain: {row.get('Elevation Gain', '-')}"
+                    chart_df = edited.copy()
+                    chart_df["WeekNum"] = chart_df["Week"].str.extract(r"(\d+)").astype(int)
+                    chart_df["Planned"] = chart_df["Total"].apply(lambda x: float(str(x).replace(" km", "")))
+                    chart_df["Actual"] = [
+                        df[
+                            (df["Date"].dt.date >= pd.to_datetime(row["Start Date"]).date()) &
+                            (df["Date"].dt.date <= pd.to_datetime(row["Start Date"]).date() + timedelta(days=6))
+                        ]["Distance (km)"].sum() if "Distance (km)" in df.columns else 0
+                        for _, row in chart_df.iterrows()
+                    ]
+                    chart_df = chart_df.sort_values("WeekNum").reset_index(drop=True)
+                    melted = chart_df.melt(id_vars=["Week", "WeekNum", "Start Date"], value_vars=["Planned", "Actual"], var_name="Type", value_name="Distance")
+                    race_week_idx = None
+                    for idx2, row in chart_df.iterrows():
+                        try:
+                            start_str = str(row["Start Date"])
+                            start = pd.to_datetime(start_str, errors="coerce")
+                            if pd.isnull(start):
+                                continue
+                            start = start.date()
+                            end = start + timedelta(days=6)
+                            race_date_val = pd.to_datetime(race.get("date", ""), errors="coerce")
+                            if pd.isnull(race_date_val):
+                                continue
+                            race_date_val = race_date_val.date()
+                            if start <= race_date_val <= end:
+                                race_week_idx = idx2
+                                break
+                        except Exception:
+                            continue
+                    chart = alt.Chart(melted).mark_area(line=True, point=True, interpolate='monotone', opacity=0.5).encode(
+                        x=alt.X("WeekNum:O", title="Week", sort="ascending", axis=alt.Axis(labelAngle=-45, labelOverlap=True)),
+                        y=alt.Y("Distance:Q", title="Distance (km)", stack=None),
+                        color=alt.Color("Type:N", scale=alt.Scale(domain=["Planned", "Actual"], range=["#1EBEFF", "#FF9633"]))
+                    )
+                    if race_week_idx is not None:
+                        race_weeknum = chart_df.iloc[race_week_idx]["WeekNum"]
+                        race_distance = chart_df.iloc[race_week_idx]["Planned"]
+                        is_exact_race_day = False
+                        try:
+                            is_exact_race_day = pd.to_datetime(race.get("date", "")).date() == pd.to_datetime(chart_df.iloc[race_week_idx]["Start Date"]).date()
+                        except Exception:
+                            pass
+                        label_text = "🏁 Race Day 🎉" if is_exact_race_day else "🏁 Race Week"
+                        race_label = alt.Chart(pd.DataFrame({
+                            "WeekNum": [race_weeknum],
+                            "Distance": [race_distance],
+                            "label": [label_text]
+                        })).mark_text(
+                            align='left', baseline='bottom', dx=10, dy=-10, fontSize=16, fontWeight="bold", color="#FFD700"
+                        ).encode(
+                            x=alt.X("WeekNum:O"),
+                            y=alt.Y("Distance:Q"),
+                            text="label:N"
                         )
-                        lap_details = row.get("Lap Details", "").strip()
-                        lap_data.append(summary + "\n" + lap_details)
-                    lap_text = "\n\n".join(lap_data)
-
-                    history = load_progress_feedback()
-                    race_history = history.get(race_id, [])
-                    previous_notes = "\n".join(f"- {item['feedback']}" for item in race_history[-2:])
-
-                    prompt = generate_ai_prompt(selected_race, today_str, race_date, plan_df, chart_df, lap_text, previous_notes)
+                        chart = chart + race_label
+                    st.altair_chart(chart.properties(height=260), use_container_width=True)
 
                     try:
-                        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-                        response = client.chat.completions.create(
-                            model="gpt-4-turbo",
-                            messages=[
-                                {"role": "system", "content": "You are a professional running coach offering insights."},
-                                {"role": "user", "content": prompt}
-                            ]
-                        )
-                        feedback = response.choices[0].message.content
-                        st.success("✅ Feedback received:")
-                        st.markdown(f"""<div style='padding:12px; background:#1c1c1e; border-radius:10px; line-height:1.6; font-size:0.95rem;'>{feedback}</div>""", unsafe_allow_html=True)
-                        save_progress_feedback(race_id, {"date": today_str, "feedback": feedback})
-                        st.session_state['last_ai_feedback'] = feedback
+                        render_feedback_history(race_id, user_info, gist_id, filename, token)
                     except Exception as e:
-                        st.error(f"Failed to analyze progress: {e}")
+                        st.error(f"Error displaying feedback: {e}")
 
-                render_feedback_history(race_id)
+        except Exception as e:
+            st.error(f"Error rendering race section: {e}")
+
+def _parse_day_cell(cell):
+    try:
+        dist, desc = str(cell).split(" km:", 1)
+        return {"distance": float(dist.strip()), "description": desc.strip()}
+    except Exception:
+        return {"distance": 0.0, "description": str(cell)}

@@ -1,12 +1,7 @@
 import requests
 import json
-import streamlit as st
 
-gist_id = st.secrets["GIST_ID"]
-token = st.secrets["GITHUB_TOKEN"]
-filename = st.secrets["gist_filename"]
-
-def load_gist_data():
+def load_gist_data(gist_id, filename, token):
     url = f"https://api.github.com/gists/{gist_id}"
     headers = {"Authorization": f"token {token}"}
     response = requests.get(url, headers=headers)
@@ -24,7 +19,7 @@ def load_gist_data():
     print(f"Failed to load gist: {response.status_code} {response.text}")
     return {}
 
-def save_gist_data(data):
+def save_gist_data(gist_id, filename, token, data):
     url = f"https://api.github.com/gists/{gist_id}"
     headers = {"Authorization": f"token {token}"}
     payload = {"files": {filename: {"content": json.dumps(data, indent=2)}}}
