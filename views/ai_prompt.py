@@ -84,3 +84,96 @@ def generate_ai_prompt(selected_race, today_str, race_date, plan_df, chart_df, l
     )
     # print (prompt)
     return prompt
+
+def generate_ai_plan_prompt(race_info, ai_notes=None):
+    """
+    Generate a comprehensive prompt for the AI to create a training plan table for a race.
+    race_info: dict with keys name, date, distance, type, elevation_gain, goal_time, notes, runner_profile
+    ai_notes: str, extra user notes for the AI
+    """
+    # Calculate number of weeks between training start date and race date
+    from datetime import datetime, timedelta
+    try:
+        start_date_str = race_info.get('runner_profile',{}).get('training_start_date','')
+        race_date_str = race_info.get('date','')
+        start_date = pd.to_datetime(start_date_str)
+        race_date = pd.to_datetime(race_date_str)
+        # Align both to Monday
+        start_monday = start_date - pd.Timedelta(days=start_date.weekday())
+        race_monday = race_date - pd.Timedelta(days=race_date.weekday())
+        num_weeks = ((race_monday - start_monday).days // 7) + 1
+    except Exception:
+        num_weeks = None
+
+    prompt = f"""
+📋 ROLE:
+You are a world-class expert running coach. Your task is to generate a complete, structured, and realistic weekly training plan for a runner targeting a race.
+
+🏁 Race Information
+Race Name: {race_info.get('name','')}
+Race Date: {race_info.get('date','')}
+Training Start Date: {race_info.get('runner_profile',{}).get('training_start_date','')}
+Distance: {race_info.get('distance','')} km
+Race Type: {race_info.get('type','')} (e.g., road, trail, ultra)
+Elevation Gain: {race_info.get('elevation_gain','')} m
+Goal Time: {race_info.get('goal_time','')}
+Race Notes: {race_info.get('notes','')}
+Number of weeks from training start to race week: {num_weeks if num_weeks is not None else '[calculate it]'}
+
+🧍 Runner Profile
+Experience Level: {race_info.get('runner_profile',{}).get('experience','')}
+Average Weekly KM: {race_info.get('runner_profile',{}).get('weekly_km','')}
+Most Recent Race: {race_info.get('runner_profile',{}).get('recent_race','')}
+Available Training Days per Week: {race_info.get('runner_profile',{}).get('available_days','')}
+Known Limitations (e.g., injuries): {race_info.get('runner_profile',{}).get('limitations','')}
+Preferred Workout Types: {race_info.get('runner_profile',{}).get('preferred_workout_types','')}
+Other Personal Notes: {race_info.get('runner_profile',{}).get('other_notes','')}
+
+✍️ Additional Notes (from user):
+{ai_notes or '[None]'}
+
+✅ INSTRUCTIONS:
+- Create a progressive, week-by-week training plan starting from the Training Start Date and ending the week of the Race Date.
+- Fix: Add a down week every 3–4 weeks to reduce injury risk. drop the total volum minumum by 30–35%. 
+
+Each row represents one full week of training. You must:
+- Output exactly {num_weeks if num_weeks is not None else '[calculate it]'} rows.
+- Always begin each week on a Monday.
+- Include a taper phase and one final row containing Race Day.
+- For Race Week,  mark the correct day as `X km: Race day – Execute race strategy`.
+- If any field contains a comma, enclose that field in double quotes to ensure proper CSV parsing
+
+Each day's value must follow this format:
+X km: Workout type – Full detailed description include warming up, cooling down, and any specific instructions.
+Examples:
+- `10.0 km: Easy run – Zone 2 effort, nasal breathing`
+- `0.0 km: Rest – Full rest day, mobility optional`
+- `6.0 km: Intervals – 4x1km @ 10K pace with 90s jog`
+
+✅ FORMAT:
+Return the plan as **raw CSV only**. Do **not** include:
+- Any markdown
+- Code blocks
+- Text explanations
+- Headers or footers
+
+Only return the table in this column order:
+
+```
+Week,Start Date,Status,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday,Comment
+```
+
+Use:
+- `💤 Future` for all weeks before race week
+- `🏁 Race Week` as the final week's status
+
+📌 Example line:
+```
+Week 1,2025-05-12,💤 Future,5.0 km: Easy run – Light form,0.0 km: Rest – Recovery,6.0 km: Intervals – 4x1km @ threshold,5.0 km: Easy – Nasal breathing,0.0 km: Rest – Optional yoga,14.0 km: Long run – Easy trail effort,3.0 km: Recovery – Gentle jog,Base phase: Establish consistency
+```
+
+⛔ STRICT RULE:
+Return **CSV only**. No markdown formatting, no bullet points, no surrounding text.
+"""
+    print (prompt)
+    return prompt

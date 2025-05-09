@@ -131,40 +131,54 @@ def render_activities(df):
                     # Load saved analyses
                     saved_analyses = load_saved_analyses()
                     
+                    # Feature-based access control for AI analysis
+                    user_info = st.session_state.get('user_info', {})
+                    features = user_info.get('Features', []) or user_info.get('features', [])
+                    if isinstance(features, str):
+                        import json
+                        try:
+                            features = json.loads(features)
+                        except Exception:
+                            features = []
+                    ai_enabled = 'ai' in features
+                    
                     # Create columns for analysis actions
                     col1, col2 = st.columns([1, 4])
                     
                     with col1:
                         # Add button to trigger AI analysis
-                        if st.button("Generate Analysis", key=f"button_{activity_key}"):
-                            prompt = (
-                                "Analyze this running activity based on the following per-lap data.\n"
-                                "Comment on pacing strategy, consistency, heart rate trends, and elevation impact.\n"
-                                "Provide specific, actionable feedback for improvement.\n"
-                                f"\nLap Data:\n{lap_df.to_csv(index=False)}\n"
-                                f"\nRun Summary: {selected_row['Distance (km)']}km, "
-                                f"Avg Pace: {format_pace(selected_row['Pace (min/km)'])}, "
-                                f"Avg HR: {selected_row['Avg HR']}, "
-                                f"Elevation Gain: {selected_row['Elevation Gain']}m"
-                            )
-                            with st.spinner("Analyzing your run data..."):
-                                try:
-                                    response = client.chat.completions.create(
-                                        # model="gpt-4",
-                                        model="gpt-3.5-turbo",
-                                        messages=[
-                                            {"role": "system", "content": "You are a professional running coach with expertise in analyzing running data. Provide specific insights and actionable advice."},
-                                            {"role": "user", "content": prompt}
-                                        ]
-                                    )
-                                    # Store in session state AND save to file
-                                    analysis_content = response.choices[0].message.content
-                                    st.session_state[activity_key] = analysis_content
-                                    save_success = save_analysis(activity_key, analysis_content)
-                                    if save_success:
-                                        st.success("Analysis complete!")
-                                except Exception as e:
-                                    st.error(f"Error generating analysis: {e}")
+                        if ai_enabled:
+                            if st.button("Generate Analysis", key=f"button_{activity_key}"):
+                                prompt = (
+                                    "Analyze this running activity based on the following per-lap data.\n"
+                                    "Comment on pacing strategy, consistency, heart rate trends, and elevation impact.\n"
+                                    "Provide specific, actionable feedback for improvement.\n"
+                                    f"\nLap Data:\n{lap_df.to_csv(index=False)}\n"
+                                    f"\nRun Summary: {selected_row['Distance (km)']}km, "
+                                    f"Avg Pace: {format_pace(selected_row['Pace (min/km)'])}, "
+                                    f"Avg HR: {selected_row['Avg HR']}, "
+                                    f"Elevation Gain: {selected_row['Elevation Gain']}m"
+                                )
+                                with st.spinner("Analyzing your run data..."):
+                                    try:
+                                        response = client.chat.completions.create(
+                                            # model="gpt-4",
+                                            model="gpt-3.5-turbo",
+                                            messages=[
+                                                {"role": "system", "content": "You are a professional running coach with expertise in analyzing running data. Provide specific insights and actionable advice."},
+                                                {"role": "user", "content": prompt}
+                                            ]
+                                        )
+                                        # Store in session state AND save to file
+                                        analysis_content = response.choices[0].message.content
+                                        st.session_state[activity_key] = analysis_content
+                                        save_success = save_analysis(activity_key, analysis_content)
+                                        if save_success:
+                                            st.success("Analysis complete!")
+                                    except Exception as e:
+                                        st.error(f"Error generating analysis: {e}")
+                        else:
+                            st.button("Generate Analysis (Locked)", key=f"button_{activity_key}", disabled=True, help="You do not have access to AI features.")
                     
                     with col2:
                         # Button to delete analysis if it exists
