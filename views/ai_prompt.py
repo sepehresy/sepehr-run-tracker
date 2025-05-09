@@ -107,7 +107,7 @@ def generate_ai_plan_prompt(race_info, ai_notes=None):
 
     prompt = f"""
 📋 ROLE:
-You are a world-class expert running coach. Your task is to generate a complete, structured, and realistic weekly training plan for a runner targeting a race.
+You are a certified world-class expert running coach. Your task is to generate a complete, structured, and realistic weekly training plan for a runner targeting a race as described below.
 
 🏁 Race Information
 Race Name: {race_info.get('name','')}
@@ -133,13 +133,15 @@ Other Personal Notes: {race_info.get('runner_profile',{}).get('other_notes','')}
 {ai_notes or '[None]'}
 
 ✅ INSTRUCTIONS:
-- Create a progressive, week-by-week training plan starting from the Training Start Date and ending the week of the Race Date.
-- Fix: Add a down week every 3–4 weeks to reduce injury risk. drop the total volum minumum by 30–35%. 
+- Create a comprehensive, week-by-week training plan starting from the Training Start Date and ending the week of the Race Date.
+- Add a down week every 4 weeks to reduce injury risk by drop the total volum minumum by 25–35%. 
+- Include a taper phase in the last 2-3 weeks before the race depending on the race info and total number of weeks.
+- make sure include all kind of training types: easy, long, intervals, tempo, hill repeats, VO2-max, lactate threshold and rest days.
 
 Each row represents one full week of training. You must:
 - Output exactly {num_weeks if num_weeks is not None else '[calculate it]'} rows.
 - Always begin each week on a Monday.
-- Include a taper phase and one final row containing Race Day.
+- final row containing Race Day.
 - For Race Week,  mark the correct day as `X km: Race day – Execute race strategy`.
 - If any field contains a comma, enclose that field in double quotes to ensure proper CSV parsing
 
@@ -150,30 +152,36 @@ Examples:
 - `0.0 km: Rest – Full rest day, mobility optional`
 - `6.0 km: Intervals – 4x1km @ 10K pace with 90s jog`
 
-✅ FORMAT:
-Return the plan as **raw CSV only**. Do **not** include:
-- Any markdown
-- Code blocks
-- Text explanations
-- Headers or footers
+✅ Output FORMAT:
+- Return **CSV only**, with **no** markdown, code fences, or extra text.
+- **Use comma** (`,`) as the sole column separator.
+- **Enclose every field** in double quotes (`"`) — even numeric or date fields.
+- **Do not** emit any unquoted fields.
+- **Do not** include header/footer lines besides the required header row.
+- **No** extra whitespace around commas.
+- **No** line breaks inside quoted fields (each record = one line).
+- Output only the table, no preamble or postscript.
+- Each value must be wrapped in double quotes `"`.
+- Fields must be separated by commas.
 
-Only return the table in this column order:
 
-```
-Week,Start Date,Status,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday,Comment
-```
 
-Use:
-- `💤 Future` for all weeks before race week
-- `🏁 Race Week` as the final week's status
+✅ Use "status" values `"💤 Future"` or `"✅ completed"` if the week is already passed and `"🏁 Race Week"`.
+✅ The "Comment" column should start with the traing phase (peak, build, endurance, tapering, etc) and briefly describe the week's purpose.
 
-📌 Example line:
-```
-Week 1,2025-05-12,💤 Future,5.0 km: Easy run – Light form,0.0 km: Rest – Recovery,6.0 km: Intervals – 4x1km @ threshold,5.0 km: Easy – Nasal breathing,0.0 km: Rest – Optional yoga,14.0 km: Long run – Easy trail effort,3.0 km: Recovery – Gentle jog,Base phase: Establish consistency
-```
+✅ The header row must be exactly:
+  `"Week","Start Date","Status","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Comment"`
 
-⛔ STRICT RULE:
-Return **CSV only**. No markdown formatting, no bullet points, no surrounding text.
+✅ Example output (2 weeks):
+'''
+"Week","Start Date","Status","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Comment"
+"Week 1","2025-05-12","💤 Future","6 km: Easy aerobic","Rest","8 km: Easy + strides","Rest","6 km: Easy","14 km: Long easy","Rest","Base: Initial adaptation"
+"Week 2","2025-05-19","💤 Future","6 km: Easy recovery","Rest","10 km: Intervals (4x1km @5:00)","Rest","6 km: Easy","16 km: Steady long","Rest","Base: Speed intro"
+'''
+
+⛔ STRICT RULEs:
+- Return **CSV only**. No markdown formatting, no bullet points, no surrounding text.
+- Output exactly {num_weeks if num_weeks is not None else '[calculate it]'} rows. no more, no less.
 """
     print (prompt)
     return prompt
