@@ -7,7 +7,11 @@ from views.ai_prompt import generate_ai_prompt, generate_ai_plan_prompt
 from utils.gist_helpers import load_gist_data, save_gist_data
 import openai
 from utils.gsheet import fetch_gsheet_plan
-from utils.parse_helper import parse_markdown_plan_table, parse_csv_plan_table, load_csv_from_text
+from utils.parse_helper import parse_markdown_plan_table, parse_csv_plan_table, load_csv_from_text, parse_training_plan
+
+DEBUG_MODE = st.secrets.get("DEBUG_MODE", False)
+print ("DEBUG_MODE:", DEBUG_MODE)
+DEBUG_AI_PLAN_PATH = "data/analyses/ai_plan_debug3.txt"
 
 def load_gist_race_data(user_info, gist_id, filename, token):
     data = load_gist_data(gist_id, filename, token)
@@ -297,7 +301,7 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
         st.info("No races added yet. Add a race to get started.")
         return
 
-    DEBUG_AI_PLAN_PATH = "data/analyses/ai_plan_debug.txt"
+    
 
     for i, race in enumerate(races):
         try:
@@ -360,16 +364,37 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                         ai_note = st.text_area("AI Notes", key=f"ai_note_{race_id}")
                         c1, c2 = st.columns([1,1])
                         if c1.button("Send to AI", key=f"send_ai_{race_id}"):
+                            # --- Initialize default table skeleton before AI load ---
+                            # Use existing plan weeks to set up skeleton rows
+                            current_weeks = plan.get("weeks", [])
+                            default_weeks = []
+                            for w in current_weeks:
+                                default_weeks.append({
+                                    "week_number": w.get("week_number"),
+                                    "start_date": w.get("start_date"),
+                                    "status": "",
+                                    "monday": {"distance": 0.0, "description": ""},
+                                    "tuesday": {"distance": 0.0, "description": ""},
+                                    "wednesday": {"distance": 0.0, "description": ""},
+                                    "thursday": {"distance": 0.0, "description": ""},
+                                    "friday": {"distance": 0.0, "description": ""},
+                                    "saturday": {"distance": 0.0, "description": ""},
+                                    "sunday": {"distance": 0.0, "description": ""},
+                                    "comment": "",
+                                    "total_distance": 0.0
+                                })
+                            st.session_state[f"plan_buffer_{race_id}"] = default_weeks
                             from views.ai_prompt import generate_ai_plan_prompt
                             prompt = generate_ai_plan_prompt(race, ai_note)
                             try:
-                                debug_mode = True
-                                if debug_mode:
+                                if DEBUG_MODE:
+                                    print("DEBUG_MODE: AI Plan", DEBUG_MODE)
                                     with open(DEBUG_AI_PLAN_PATH, 'r', encoding='utf-8') as f:
                                         ai_table_md = f.read().strip()
                                         if ai_table_md.startswith("'") and ai_table_md.endswith("'"):
                                             ai_table_md = ai_table_md[1:-1]
                                         ai_table_md = ai_table_md.replace("\\n", "\n")
+                                        print("ai_table_md - \n", ai_table_md)
                                 else:
                                     client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
                                     response = client.chat.completions.create(
@@ -380,15 +405,24 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                                         ]
                                     )
                                     ai_table_md = response.choices[0].message.content
-                                df = parse_csv_plan_table(ai_table_md)
-                                required_cols = ["Week", "Start Date", "Status", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Comment"]
+                                
+                                # df = parse_csv_plan_table(ai_table_md)
+                                df = parse_training_plan (ai_table_md)
+                                print ("AI Plan DataFrame:\n", df)
+                                # df = parse_csv_plan_table(df)
+                                required_cols = ["Week","Start Date","Status","Monday","Tuesday",
+                                                 "Wednesday","Thursday","Friday","Saturday",
+                                                 "Sunday","Comment"]
                                 if df is None or not all(col in df.columns for col in required_cols):
                                     st.error("AI plan table format is invalid. Please try again or edit manually.")
                                 else:
                                     new_weeks = []
                                     for _, row in df.iterrows():
+                                        # Build week dictionary
                                         week = {
-                                            "week_number": int(str(row["Week"]).replace("Week ", "").strip()) if str(row["Week"]).replace("Week ", "").strip().isdigit() else row["Week"],
+                                            "week_number": int(str(row["Week"]).replace("Week ", "").strip())
+                                                if str(row["Week"]).replace("Week ", "").strip().isdigit()
+                                                else row["Week"],
                                             "start_date": str(row["Start Date"]),
                                             "status": row["Status"],
                                             "monday": _parse_day_cell(row["Monday"]),
@@ -400,10 +434,15 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                                             "sunday": _parse_day_cell(row["Sunday"]),
                                             "comment": row["Comment"]
                                         }
-                                        week["total_distance"] = sum([
-                                            week[day]["distance"] for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-                                        ])
+                                        # Calculate total distance
+                                        week["total_distance"] = sum(
+                                            week[day]["distance"] for day in [
+                                                "monday","tuesday","wednesday",
+                                                "thursday","friday","saturday","sunday"
+                                            ]
+                                        )
                                         new_weeks.append(week)
+                                    # write the new plan into session
                                     st.session_state[f"plan_buffer_{race_id}"] = new_weeks
                                     st.success("AI plan loaded. Don't forget to Save Plan to keep changes.")
                                     st.session_state[f"ai_plan_mode_{race_id}"] = False
