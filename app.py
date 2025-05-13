@@ -9,8 +9,8 @@ import requests
 import json
 
 # Set Streamlit app config
-# st.set_page_config(page_title="Sepehr's Running Dashboard", layout="wide")
-st.set_page_config(page_title="Sepehr's Running Dashboard", layout="wide", theme={"base": "dark"})
+st.set_page_config(page_title="Sepehr's Running Dashboard", layout="wide")
+# st.set_page_config(page_title="Sepehr's Running Dashboard", layout="wide", theme={"base": "dark"})
 
 # --- Authenticate user ---
 def load_users():
