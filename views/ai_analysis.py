@@ -12,12 +12,5 @@ def render_ai_analysis(df, today):
 
     st.subheader(f"AI Coach Feedback for {selected_date}")
     st.write("""
-    Based on your selected activity, you demonstrated consistent pacing with notable heart rate control in the early kilometers. However, there's a gradual decline in pace and rise in HR after the halfway point, suggesting fatigue.
-
-    **Suggestions:**
-    - Focus on mid-run fueling strategies to avoid the dip in performance.
-    - Incorporate tempo efforts to maintain form during late stages.
-    - Consider reviewing cadence stability during climb segments.
-
-    Overall, you're progressing well. Keep up the consistency and tune recovery before your next intensity block!
+    This is a Pro Feature! Contact the developer to unlock this feature.
     """)

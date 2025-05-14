@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from openai import OpenAI
 import json
 import os
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 # Create analyses directory if it doesn't exist
 os.makedirs("data/analyses", exist_ok=True)
@@ -34,20 +35,62 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 def render_activities(df):
     st.title("📋 Activities")
 
-    st.dataframe(df.sort_values("Date", ascending=False))
+    # Sort and reset index for consistent row selection
+    sorted_df = df.sort_values("Date", ascending=False).reset_index(drop=True)
 
-    if "Lap Details" in df.columns:
-        st.subheader("Splits (per run)")
+    st.markdown("### 🧾 Click a row below to select")
 
-        activity_options = df.sort_values("Date", ascending=False).apply(
-            lambda row: f"{row['Date'].date()} - {row['Name']}", axis=1
+    # Only show relevant columns in the AgGrid table
+    display_columns = [
+        "Date", "Name", "Type", "Distance (km)", "Pace (min/km)", "Moving Time",
+        "Cadence", "Avg HR", "Elevation Gain"
+    ]
+    display_df = sorted_df[display_columns]
+
+    # Setup AgGrid options for single-row selection
+    gb = GridOptionsBuilder.from_dataframe(display_df)
+    gb.configure_selection("single", use_checkbox=False)
+    grid_options = gb.build()
+
+    # Render AgGrid table
+    grid_response = AgGrid(
+        display_df,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        fit_columns_on_grid_load=True,
+        theme="balham-dark",
+        height=350
+    )
+
+    selected_rows = grid_response["selected_rows"]
+
+    # Map selected row back to full data using Date + Name as unique key
+    selected_row_full = None
+    # Robustly check for selection regardless of AgGrid return type
+    if isinstance(selected_rows, pd.DataFrame):
+        has_selection = not selected_rows.empty
+    elif isinstance(selected_rows, list):
+        has_selection = len(selected_rows) > 0
+    else:
+        has_selection = False
+
+    if has_selection:
+        if isinstance(selected_rows, pd.DataFrame):
+            sel = selected_rows.iloc[0].to_dict()
+        else:
+            sel = selected_rows[0]
+        # Defensive: handle both dict and DataFrame row
+        sel_date = sel["Date"] if isinstance(sel, dict) else sel.Date
+        sel_name = sel["Name"] if isinstance(sel, dict) else sel.Name
+        # Find the full row in sorted_df
+        match = (
+            (sorted_df["Date"] == sel_date) & (sorted_df["Name"] == sel_name)
         )
-        selected_activity = st.selectbox("Select an activity to view splits:", activity_options)
+        if match.any():
+            selected_row_full = sorted_df[match].iloc[0]
 
-        selected_row = df[df.apply(
-            lambda row: f"{row['Date'].date()} - {row['Name']}" == selected_activity, axis=1
-        )].iloc[0]
-
+    if selected_row_full is not None:
+        selected_row = selected_row_full
         def format_pace(p):
             try:
                 minutes = int(p)
@@ -63,16 +106,17 @@ def render_activities(df):
             ("Moving Time", selected_row.get("Moving Time", "-")),
             ("Cadence", selected_row.get("Cadence", "-")),
             ("Power (W)", selected_row.get("Power (W)", "-")),
-            ("Avg HR", selected_row.get("Avg HR", "-")),
-            ("Max HR", selected_row.get("Max HR", "-")),
-            ("Elevation Gain", selected_row.get("Elevation Gain", "-")),
+            ("Avg HR ❤️", selected_row.get("Avg HR", "-")),
+            ("Max HR ❤️", selected_row.get("Max HR", "-")),
+            ("Elevation Gain 🏔️", selected_row.get("Elevation Gain", "-")),
             ("Calories", selected_row.get("Calories", "-")),
         ]
         cols = st.columns(len(metrics))
         for i, (label, value) in enumerate(metrics):
             cols[i].metric(label, value)
 
-        if pd.notna(selected_row["Lap Details"]):
+        lap_df = pd.DataFrame()
+        if "Lap Details" in selected_row and pd.notna(selected_row["Lap Details"]):
             try:
                 laps_raw = re.findall(r"Lap (\d+):\s*([^|]+)", selected_row["Lap Details"].replace("\\n", " "))
                 lap_data = []
@@ -93,7 +137,10 @@ def render_activities(df):
                         elif p.startswith("ElevGain"):
                             lap_info["ElevGain"] = float(p.replace("ElevGain", "").strip())
                     lap_data.append(lap_info)
-
+                day_str = selected_row['Date'].strftime('%A')
+                date_str = selected_row['Date'].strftime('%Y-%m-%d')
+                name_str = selected_row['Name']
+                st.subheader(f"{day_str}  -- {date_str} -- {name_str}")
                 lap_df = pd.DataFrame(lap_data)
                 if not lap_df.empty:
                     fig, ax = plt.subplots(figsize=(10, 0.4 * len(lap_df)))
@@ -123,85 +170,100 @@ def render_activities(df):
                     ax.set_xlim(0, max(lap_df["Pace"]) + 2)
                     st.pyplot(fig)
 
-                    st.subheader("🧠 AI Analysis of This Run")
-                    
-                    # Create a unique key for this activity
-                    activity_key = f"analysis_{selected_activity}"
-                    
-                    # Load saved analyses
-                    saved_analyses = load_saved_analyses()
-                    
-                    # Feature-based access control for AI analysis
-                    user_info = st.session_state.get('user_info', {})
-                    features = user_info.get('Features', []) or user_info.get('features', [])
-                    if isinstance(features, str):
-                        import json
-                        try:
-                            features = json.loads(features)
-                        except Exception:
-                            features = []
-                    ai_enabled = 'ai' in features
-                    
-                    # Create columns for analysis actions
-                    col1, col2 = st.columns([1, 4])
-                    
-                    with col1:
-                        # Add button to trigger AI analysis
-                        if ai_enabled:
-                            if st.button("Generate Analysis", key=f"button_{activity_key}"):
-                                prompt = (
-                                    "Analyze this running activity based on the following per-lap data.\n"
-                                    "Comment on pacing strategy, consistency, heart rate trends, and elevation impact.\n"
-                                    "Provide specific, actionable feedback for improvement.\n"
-                                    f"\nLap Data:\n{lap_df.to_csv(index=False)}\n"
-                                    f"\nRun Summary: {selected_row['Distance (km)']}km, "
-                                    f"Avg Pace: {format_pace(selected_row['Pace (min/km)'])}, "
-                                    f"Avg HR: {selected_row['Avg HR']}, "
-                                    f"Elevation Gain: {selected_row['Elevation Gain']}m"
-                                )
-                                with st.spinner("Analyzing your run data..."):
-                                    try:
-                                        response = client.chat.completions.create(
-                                            # model="gpt-4",
-                                            model="gpt-3.5-turbo",
-                                            messages=[
-                                                {"role": "system", "content": "You are a professional running coach with expertise in analyzing running data. Provide specific insights and actionable advice."},
-                                                {"role": "user", "content": prompt}
-                                            ]
-                                        )
-                                        # Store in session state AND save to file
-                                        analysis_content = response.choices[0].message.content
-                                        st.session_state[activity_key] = analysis_content
-                                        save_success = save_analysis(activity_key, analysis_content)
-                                        if save_success:
-                                            st.success("Analysis complete!")
-                                    except Exception as e:
-                                        st.error(f"Error generating analysis: {e}")
-                        else:
-                            st.button("Generate Analysis (Locked)", key=f"button_{activity_key}", disabled=True, help="You do not have access to AI features.")
-                    
-                    with col2:
-                        # Button to delete analysis if it exists
-                        if activity_key in saved_analyses or activity_key in st.session_state:
-                            if st.button("Delete Analysis", key=f"delete_{activity_key}"):
-                                if activity_key in st.session_state:
-                                    del st.session_state[activity_key]
-                                if activity_key in saved_analyses:
-                                    saved_analyses.pop(activity_key)
-                                    with open("data/analyses/saved_analyses.json", "w") as f:
-                                        json.dump(saved_analyses, f)
-                                    st.experimental_rerun()
-                    
-                    # Display analysis if it exists in session state OR in saved analyses
-                    if activity_key in st.session_state:
-                        st.write(st.session_state[activity_key])
-                    elif activity_key in saved_analyses:
-                        st.session_state[activity_key] = saved_analyses[activity_key]  # Load into session state
-                        st.write(saved_analyses[activity_key])
-                    else:
-                        st.info("Click 'Generate Analysis' for AI insights on this run")
-
             except Exception as e:
                 st.warning(f"Could not parse lap details: {e}")
 
         st.markdown("---")
+
+        # --- AI Analysis Section (always available) ---
+        st.subheader("🧠 AI Analysis of This Run")
+
+        # Create a unique key for this activity
+        activity_key = f"analysis_{selected_row['Date']}_{selected_row['Name']}"
+
+        # Load saved analyses
+        saved_analyses = load_saved_analyses()
+
+        # Feature-based access control for AI analysis
+        user_info = st.session_state.get('user_info', {})
+        features = user_info.get('Features', []) or user_info.get('features', [])
+        if isinstance(features, str):
+            try:
+                features = json.loads(features)
+            except Exception:
+                features = []
+        ai_enabled = 'ai' in features
+
+        # Create columns for analysis actions
+        col1, col2 = st.columns([1, 4])
+
+        with col1:
+            # Add button to trigger AI analysis
+            if ai_enabled:
+                if st.button("Generate Analysis", key=f"button_{activity_key}"):
+                    lap_csv = lap_df.to_csv(index=False) if 'lap_df' in locals() and not lap_df.empty else ''
+                    # Get runner profile from session state if available
+                    runner_profile = st.session_state.get('user_info', {}).get('runner_profile', {})
+                    runner_profile_str = json.dumps(runner_profile, indent=2) if runner_profile else "Not available"
+                    day_str = selected_row['Date'].strftime('%A')
+                    date_str = selected_row['Date'].strftime('%Y-%m-%d')
+                    name_str = selected_row['Name']
+                    prompt = (
+                        "Analyze this running activity based on the following data. looks at per lap data as well if available\n"
+                        "Comment on what is the impact of the activity. what is ecexuted good and what needs to be improved \n"
+                        "Comment on general feedback of this activity \n"
+                        "Provide specific, actionable feedback for improvement.\n"
+                        f"\nLap Data:\n{lap_csv}\n"
+                        f"\nRun Summary: {selected_row['Distance (km)']}km, "
+                        f"Avg Pace: {format_pace(selected_row['Pace (min/km)'])}, "
+                        f"Avg HR: {selected_row['Avg HR']}, "
+                        f"Max HR: {selected_row.get('Max HR', '-')}, "
+                        f"Cadence: {selected_row.get('Cadence', '-')}, "
+                        f"Power: {selected_row.get('Power (W)', '-')}, "
+                        f"Calories: {selected_row.get('Calories', '-')}, "
+                        f"Elevation Gain: {selected_row['Elevation Gain']}m, "
+                        f"Day: {day_str}, Date: {date_str}, Name: {name_str}"
+                        f"\n\nRunner Profile:\n{runner_profile_str}"
+                    )
+                    print (f"AI Prompt \n: {prompt}")
+                    with st.spinner("Analyzing your run data..."):
+                        try:
+                            response = client.chat.completions.create(
+                                model="gpt-4-turbo",
+                                messages=[
+                                    {"role": "system", "content": "You are a professional running coach with expertise in analyzing running data. Provide specific insights and actionable advice."},
+                                    {"role": "user", "content": prompt}
+                                ]
+                            )
+                            analysis_content = response.choices[0].message.content
+                            st.session_state[activity_key] = analysis_content
+                            save_success = save_analysis(activity_key, analysis_content)
+                            if save_success:
+                                st.success("Analysis complete!")
+                        except Exception as e:
+                            st.error(f"Error generating analysis: {e}")
+            else:
+                st.button("Generate Analysis (Locked)", key=f"button_{activity_key}", disabled=True, help="You do not have access to AI features.")
+
+        with col2:
+            # Button to delete analysis if it exists
+            if activity_key in saved_analyses or activity_key in st.session_state:
+                if st.button("Delete Analysis", key=f"delete_{activity_key}"):
+                    if activity_key in st.session_state:
+                        del st.session_state[activity_key]
+                    if activity_key in saved_analyses:
+                        saved_analyses.pop(activity_key)
+                        with open("data/analyses/saved_analyses.json", "w") as f:
+                            json.dump(saved_analyses, f)
+                        st.experimental_rerun()
+
+        # Display analysis if it exists in session state OR in saved analyses
+        if activity_key in st.session_state:
+            st.write(st.session_state[activity_key])
+        elif activity_key in saved_analyses:
+            st.session_state[activity_key] = saved_analyses[activity_key]
+            st.write(saved_analyses[activity_key])
+        else:
+            st.info("Click 'Generate Analysis' for AI insights on this run")
+    else:
+        st.info("Select an activity from the table above to view splits and analysis.")
