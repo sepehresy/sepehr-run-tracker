@@ -49,7 +49,7 @@ if not st.session_state.user_authenticated:
             st.session_state.user_authenticated = True
             st.session_state.user_info = user_info
             st.session_state.username = username
-            print('LOGIN: runner_profile:', user_info.get('runner_profile', {}))
+            # print('LOGIN: runner_profile:', user_info.get('runner_profile', {}))
 
             # After successful login, ensure user's gist file exists and is initialized if needed
             user_key = user_info["USER_KEY"]
@@ -75,7 +75,7 @@ if not st.session_state.user_authenticated:
                             # --- Load latest runner profile from Gist into session state ---
                             runner_profile = content[user_key].get("runner_profile", {})
                             st.session_state.user_info["runner_profile"] = runner_profile
-                            print('LOGIN: loaded runner_profile from Gist:', runner_profile)
+                            # print('LOGIN: loaded runner_profile from Gist:', runner_profile)
                     except Exception:
                         needs_init = True
                 if needs_init:

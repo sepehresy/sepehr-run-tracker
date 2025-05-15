@@ -7,6 +7,14 @@ import json
 import os
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
+try:
+    from streamlit_elements import elements, mui, html, sync, lazy, dashboard
+    STREAMLIT_ELEMENTS_AVAILABLE = True
+    print ("true", STREAMLIT_ELEMENTS_AVAILABLE)
+except ImportError:
+    print ("false", STREAMLIT_ELEMENTS_AVAILABLE)
+    STREAMLIT_ELEMENTS_AVAILABLE = False
+
 # Create analyses directory if it doesn't exist
 os.makedirs("data/analyses", exist_ok=True)
 
@@ -33,16 +41,18 @@ def save_analysis(key, content):
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 def render_activities(df):
+    global STREAMLIT_ELEMENTS_AVAILABLE
     st.title("📋 Activities")
 
     # Sort and reset index for consistent row selection
     sorted_df = df.sort_values("Date", ascending=False).reset_index(drop=True)
+    # print (sorted_df)
 
     st.markdown("### 🧾 Click a row below to select")
 
     # Only show relevant columns in the AgGrid table
     display_columns = [
-        "Date", "Name", "Type", "Distance (km)", "Pace (min/km)", "Moving Time",
+        "Date", "Name", "Type", "Workout Type" ,"Description" ,"Distance (km)", "Pace (min/km)", "Moving Time",
         "Cadence", "Avg HR", "Elevation Gain"
     ]
     display_df = sorted_df[display_columns]
@@ -98,23 +108,53 @@ def render_activities(df):
                 return f"{minutes}:{seconds:02d}"
             except:
                 return "-"
+        
+        day_str = selected_row['Date'].strftime('%A')
+        date_str = selected_row['Date'].strftime('%Y-%m-%d')
+        name_str = selected_row['Name']
+        st.text(f"{day_str}  -- {date_str} -- {name_str}")
+        
+        # --- Workout Type & Description Card (side by side) ---
+        Running_Type = selected_row.get("Type", "-")
+        elapsed_time = selected_row.get("Elapsed Time (min)", "-")
+        Distance = selected_row.get("Distance (km)", "-")
+        Pace = selected_row.get("Pace (min/km)", "-")
+        moving_time = selected_row.get("Moving Time", "-")
+        cadence = selected_row.get("Cadence", "-")
+        avg_hr = selected_row.get("Avg HR", "-")
+        max_hr = selected_row.get("Max HR", "-")
+        power = selected_row.get("Power (W)", "-")
+        calories = selected_row.get("Calories", "-")
+        elevation_gain = selected_row.get("Elevation Gain", "-")
+        desc = selected_row.get("Description", "-")
 
-        # Show summary metrics above plot
-        metrics = [
-            ("Total Distance (km)", selected_row.get("Distance (km)", "-")),
-            ("Pace (min/km)", format_pace(float(selected_row.get("Pace (min/km)", 0))) if selected_row.get("Pace (min/km)") != "-" else "-"),
-            ("Moving Time", selected_row.get("Moving Time", "-")),
-            ("Cadence", selected_row.get("Cadence", "-")),
-            ("Power (W)", selected_row.get("Power (W)", "-")),
-            ("Avg HR ❤️", selected_row.get("Avg HR", "-")),
-            ("Max HR ❤️", selected_row.get("Max HR", "-")),
-            ("Elevation Gain 🏔️", selected_row.get("Elevation Gain", "-")),
-            ("Calories", selected_row.get("Calories", "-")),
-        ]
-        cols = st.columns(len(metrics))
-        for i, (label, value) in enumerate(metrics):
-            cols[i].metric(label, value)
+        st.markdown(
+            f"""
+            <div style='display:flex;gap:1.2rem;margin-bottom:1.2rem;'>
+                <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;'>
+                    <span style='font-weight:600;color:#1EBEFF;'>🏷️ Running Type:</span> {Running_Type}<br/>
+                    <span style='font-weight:600;color:#1EBEFF;'>⏳ Elapsed Time:</span> {elapsed_time} min<br/>
+                    <span style='font-weight:600;color:#1EBEFF;'>⏱️ Moving Time:</span> {moving_time} min<br/>
+                    <span style='font-weight:600;color:#1EBEFF;'>🏃‍♂️ Distance:</span> {Distance} km<br/>
+                    <span style='font-weight:600;color:#1EBEFF;'>⚡ Pace:</span> {Pace} min/km<br/>
+                    <span style='font-weight:600;color:#1EBEFF;'>🏔️ Elevation Gain:</span> {elevation_gain} m<br/>
+                </div>
+                <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;'>
+                    <span style='font-weight:600;color:#b0b8c9;'>👟 cadence:</span> {cadence} <br>
+                    <span style='font-weight:600;color:#b0b8c9;'>❤️ Avg HR:</span> {avg_hr} <br>
+                    <span style='font-weight:600;color:#b0b8c9;'>💖 Max HR:</span> {max_hr} <br>
+                    <span style='font-weight:600;color:#b0b8c9;'>🔋 Power:</span> {power} <br>
+                    <span style='font-weight:600;color:#b0b8c9;'>🔥 Calories:</span> {calories} <br>
+                </div>
+                <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;flex:1;'>
+                    <span style='font-weight:600;color:#b0b8c9;'>📝 Description:</span><br>
+                    <span style='color:#e0e6f7;font-size:1rem;'>{desc}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True
+        )
 
+            
         lap_df = pd.DataFrame()
         if "Lap Details" in selected_row and pd.notna(selected_row["Lap Details"]):
             try:
@@ -137,10 +177,7 @@ def render_activities(df):
                         elif p.startswith("ElevGain"):
                             lap_info["ElevGain"] = float(p.replace("ElevGain", "").strip())
                     lap_data.append(lap_info)
-                day_str = selected_row['Date'].strftime('%A')
-                date_str = selected_row['Date'].strftime('%Y-%m-%d')
-                name_str = selected_row['Name']
-                st.subheader(f"{day_str}  -- {date_str} -- {name_str}")
+
                 lap_df = pd.DataFrame(lap_data)
                 if not lap_df.empty:
                     fig, ax = plt.subplots(figsize=(10, 0.4 * len(lap_df)))
@@ -213,7 +250,8 @@ def render_activities(df):
                         "Comment on what is the impact of the activity. what is ecexuted good and what needs to be improved \n"
                         "Comment on general feedback of this activity \n"
                         "Provide specific, actionable feedback for improvement.\n"
-                        f"\nLap Data:\n{lap_csv}\n"
+                        f"Day: {day_str}, Date: {date_str}, Name: {name_str}"
+                        
                         f"\nRun Summary: {selected_row['Distance (km)']}km, "
                         f"Avg Pace: {format_pace(selected_row['Pace (min/km)'])}, "
                         f"Avg HR: {selected_row['Avg HR']}, "
@@ -223,9 +261,11 @@ def render_activities(df):
                         f"Calories: {selected_row.get('Calories', '-')}, "
                         f"Elevation Gain: {selected_row['Elevation Gain']}m, "
                         f"Day: {day_str}, Date: {date_str}, Name: {name_str}"
-                        f"\n\nRunner Profile:\n{runner_profile_str}"
+                        f"\nLap Data:\n{lap_csv}\n"
+                        
+                        f"\n\nthese are the Runner Profile information: :\n{runner_profile_str}"
                     )
-                    print (f"AI Prompt \n: {prompt}")
+                    # print (f"AI Prompt \n: {prompt}")
                     with st.spinner("Analyzing your run data..."):
                         try:
                             response = client.chat.completions.create(
@@ -267,3 +307,4 @@ def render_activities(df):
             st.info("Click 'Generate Analysis' for AI insights on this run")
     else:
         st.info("Select an activity from the table above to view splits and analysis.")
+

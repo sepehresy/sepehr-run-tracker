@@ -13,7 +13,7 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 DEBUG_MODE = st.secrets.get("DEBUG_MODE", False)
-print ("DEBUG_MODE:", DEBUG_MODE)
+# print ("DEBUG_MODE:", DEBUG_MODE)
 DEBUG_AI_PLAN_PATH = "data/analyses/ai_plan_debug3.txt"
 
 def load_gist_race_data(user_info, gist_id, filename, token):
@@ -731,7 +731,7 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                         ai_history = []
                     # --- New AI Analysis Button (moved above history) ---
                     if st.button(f"🧠 Run AI Analysis for this race", key=f"ai_analysis_btn_{race_id}"):
-                        print ("butt pressed 1")
+                        # print ("butt pressed 1")
                         # Prepare data for AI prompt
                         today_str = str(datetime.today().date())
                         race_date = race.get('date', '')
@@ -755,7 +755,7 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                                 })
                         else:
                             plan_df = pd.DataFrame()
-                        print ("butt 3")
+                        # print ("butt 3")
                         chart_df = pd.DataFrame()  # You may want to use actual chart data if available
                         lap_text = ''  # You may want to use actual lap/run data if available
                         # Robustly join summaries from ai_history if it is a list of dicts
@@ -765,15 +765,15 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                             ])
                         else:
                             previous_notes = ''
-                        print ("butt 4")
+                        # print ("butt 4")
                         from views.ai_prompt import generate_ai_prompt
-                        print ("but pressed 2")
+                        # print ("but pressed 2")
                         prompt = generate_ai_prompt(race, today_str, race_date, plan_df, chart_df, lap_text, previous_notes)
-                        print (prompt)
+                        # print (prompt)
                         ai_feedback = None
                         ai_feedback_date = datetime.now().strftime('%Y-%m-%d %H:%M')
                         try:
-                            print (DEBUG_MODE, "    0000 debbbbbbbbbugggg")
+                            # print (DEBUG_MODE, "    0000 debbbbbbbbbugggg")
                             if DEBUG_MODE:
                                 ai_feedback = 'This is a debug AI analysis summary.'
                             else:
