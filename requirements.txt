@@ -7,3 +7,4 @@ streamlit-aggrid
 streamlit-elements
 polyline
 streamlit-folium
+streamlit-javascript

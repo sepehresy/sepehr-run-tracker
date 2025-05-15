@@ -8,6 +8,7 @@ import os
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 import requests
 from utils.elevation import fetch_elevations
+from streamlit_javascript import st_javascript
 
 try:
     from streamlit_elements import elements, mui, html, sync, lazy, dashboard
@@ -54,28 +55,21 @@ def render_activities(df):
 
     # --- Device detection for default mobile view ---
     if "is_mobile" not in st.session_state:
-        st.markdown("""
-            <script>
-            function isMobile() {
-                return (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-            }
-            window.parent.postMessage({is_mobile: isMobile()}, "*");
-            window.addEventListener("message", (event) => {
-                if (event.data && typeof event.data.is_mobile !== 'undefined') {
-                    window.localStorage.setItem('is_mobile', event.data.is_mobile);
-                }
-            });
-            </script>
-        """, unsafe_allow_html=True)
-        # Try to read from localStorage via Streamlit's query params (best effort)
-        is_mobile = st.query_params.get('is_mobile', [None])[0]
-        if is_mobile is not None:
-            st.session_state['is_mobile'] = (is_mobile == 'true')
+        user_agent = st_javascript("window.navigator.userAgent")
+        st.write(f"[DEBUG] User agent: {user_agent}")
+        if user_agent:
+            is_mobile = any(x in user_agent for x in ["Android", "webOS", "iPhone", "iPad", "iPod", "BlackBerry", "IEMobile", "Opera Mini"])
+            st.session_state['is_mobile'] = is_mobile
+            st.write(f"[DEBUG] Detected mobile: {is_mobile}")
         else:
             st.session_state['is_mobile'] = False
+            st.write("[DEBUG] Could not detect user agent, defaulting to desktop mode.")
+    else:
+        st.write(f"[DEBUG] Cached is_mobile: {st.session_state['is_mobile']}")
 
     # Use detected value for default
     mobile_view = st.toggle("📱 Mobile View", value=st.session_state.get('is_mobile', False))
+    st.write(f"[DEBUG] Mobile view toggle value: {mobile_view}")
 
     # Choose columns for table
     display_columns = (
