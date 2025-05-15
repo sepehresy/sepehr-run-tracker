@@ -5,3 +5,5 @@ matplotlib
 openai
 streamlit-aggrid
 streamlit-elements
+polyline
+streamlit-folium
