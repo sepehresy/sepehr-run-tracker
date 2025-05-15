@@ -6,6 +6,8 @@ from openai import OpenAI
 import json
 import os
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+import requests
+from utils.elevation import fetch_elevations
 
 try:
     from streamlit_elements import elements, mui, html, sync, lazy, dashboard
@@ -50,11 +52,15 @@ def render_activities(df):
 
     st.markdown("### 🧾 Click a row below to select")
 
-    # Only show relevant columns in the AgGrid table
-    display_columns = [
-        "Date", "Name", "Type", "Workout Type" ,"Description" ,"Distance (km)", "Pace (min/km)", "Moving Time",
-        "Cadence", "Avg HR", "Elevation Gain"
-    ]
+    # Mobile view toggle
+    mobile_view = st.toggle("📱 Mobile View", value=False)
+
+    # Choose columns for table
+    display_columns = (
+        ["Date", "Name", "Distance (km)", "Pace (min/km)", "Avg HR"]
+        if mobile_view else
+        ["Date", "Name", "Type", "Workout Type", "Description", "Distance (km)", "Pace (min/km)", "Moving Time", "Cadence", "Avg HR", "Elevation Gain"]
+    )
     display_df = sorted_df[display_columns]
 
     # Setup AgGrid options for single-row selection
@@ -69,7 +75,7 @@ def render_activities(df):
         update_mode=GridUpdateMode.SELECTION_CHANGED,
         fit_columns_on_grid_load=True,
         theme="balham-dark",
-        height=350
+        height=220 if mobile_view else 350
     )
 
     selected_rows = grid_response["selected_rows"]
@@ -128,36 +134,152 @@ def render_activities(df):
         elevation_gain = selected_row.get("Elevation Gain", "-")
         desc = selected_row.get("Description", "-")
 
-        st.markdown(
-            f"""
-            <div style='display:flex;gap:1.2rem;margin-bottom:1.2rem;'>
-                <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;'>
-                    <span style='font-weight:600;color:#1EBEFF;'>🏷️ Running Type:</span> {Running_Type}<br/>
-                    <span style='font-weight:600;color:#1EBEFF;'>⏳ Elapsed Time:</span> {elapsed_time} min<br/>
-                    <span style='font-weight:600;color:#1EBEFF;'>⏱️ Moving Time:</span> {moving_time} min<br/>
-                    <span style='font-weight:600;color:#1EBEFF;'>🏃‍♂️ Distance:</span> {Distance} km<br/>
-                    <span style='font-weight:600;color:#1EBEFF;'>⚡ Pace:</span> {Pace} min/km<br/>
-                    <span style='font-weight:600;color:#1EBEFF;'>🏔️ Elevation Gain:</span> {elevation_gain} m<br/>
+        if mobile_view:
+            st.markdown(
+                f"""
+                <div style='display:flex;flex-direction:column;gap:1.2rem;margin-bottom:1.2rem;'>
+                    <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;'>
+                        <span style='font-weight:600;color:#1EBEFF;'>🏷️ Running Type:</span> {Running_Type}<br/>
+                        <span style='font-weight:600;color:#1EBEFF;'>⏳ Elapsed Time:</span> {elapsed_time} min<br/>
+                        <span style='font-weight:600;color:#1EBEFF;'>⏱️ Moving Time:</span> {moving_time} min<br/>
+                        <span style='font-weight:600;color:#1EBEFF;'>🏃‍♂️ Distance:</span> {Distance} km<br/>
+                        <span style='font-weight:600;color:#1EBEFF;'>⚡ Pace:</span> {Pace} min/km<br/>
+                        <span style='font-weight:600;color:#1EBEFF;'>🏔️ Elevation Gain:</span> {elevation_gain} m<br/>
+                    </div>
+                    <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;'>
+                        <span style='font-weight:600;color:#b0b8c9;'>👟 Cadence:</span> {cadence} <br>
+                        <span style='font-weight:600;color:#b0b8c9;'>❤️ Avg HR:</span> {avg_hr} <br>
+                        <span style='font-weight:600;color:#b0b8c9;'>💖 Max HR:</span> {max_hr} <br>
+                        <span style='font-weight:600;color:#b0b8c9;'>🔋 Power:</span> {power} <br>
+                        <span style='font-weight:600;color:#b0b8c9;'>🔥 Calories:</span> {calories} <br>
+                    </div>
+                    <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;'>
+                        <span style='font-weight:600;color:#b0b8c9;'>📝 Description:</span><br>
+                        <span style='color:#e0e6f7;font-size:1rem;'>{desc}</span>
+                    </div>
                 </div>
-                <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;'>
-                    <span style='font-weight:600;color:#b0b8c9;'>👟 cadence:</span> {cadence} <br>
-                    <span style='font-weight:600;color:#b0b8c9;'>❤️ Avg HR:</span> {avg_hr} <br>
-                    <span style='font-weight:600;color:#b0b8c9;'>💖 Max HR:</span> {max_hr} <br>
-                    <span style='font-weight:600;color:#b0b8c9;'>🔋 Power:</span> {power} <br>
-                    <span style='font-weight:600;color:#b0b8c9;'>🔥 Calories:</span> {calories} <br>
+                """, unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                f"""
+                <div style='display:flex;gap:1.2rem;margin-bottom:1.2rem;'>
+                    <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;'>
+                        <span style='font-weight:600;color:#1EBEFF;'>🏷️ Running Type:</span> {Running_Type}<br/>
+                        <span style='font-weight:600;color:#1EBEFF;'>⏳ Elapsed Time:</span> {elapsed_time} min<br/>
+                        <span style='font-weight:600;color:#1EBEFF;'>⏱️ Moving Time:</span> {moving_time} min<br/>
+                        <span style='font-weight:600;color:#1EBEFF;'>🏃‍♂️ Distance:</span> {Distance} km<br/>
+                        <span style='font-weight:600;color:#1EBEFF;'>⚡ Pace:</span> {Pace} min/km<br/>
+                        <span style='font-weight:600;color:#1EBEFF;'>🏔️ Elevation Gain:</span> {elevation_gain} m<br/>
+                    </div>
+                    <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;'>
+                        <span style='font-weight:600;color:#b0b8c9;'>👟 Cadence:</span> {cadence} <br>
+                        <span style='font-weight:600;color:#b0b8c9;'>❤️ Avg HR:</span> {avg_hr} <br>
+                        <span style='font-weight:600;color:#b0b8c9;'>💖 Max HR:</span> {max_hr} <br>
+                        <span style='font-weight:600;color:#b0b8c9;'>🔋 Power:</span> {power} <br>
+                        <span style='font-weight:600;color:#b0b8c9;'>🔥 Calories:</span> {calories} <br>
+                    </div>
+                    <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;flex:1;'>
+                        <span style='font-weight:600;color:#b0b8c9;'>📝 Description:</span><br>
+                        <span style='color:#e0e6f7;font-size:1rem;'>{desc}</span>
+                    </div>
                 </div>
-                <div style='background:#222733;border-radius:12px;padding:0.7rem 1rem;flex:1;'>
-                    <span style='font-weight:600;color:#b0b8c9;'>📝 Description:</span><br>
-                    <span style='color:#e0e6f7;font-size:1rem;'>{desc}</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True
-        )
+                """, unsafe_allow_html=True
+            )
 
-            
+        # Map view if Route Polyline is available
+        map_html = None
+        show_3d = False
+        if "Route Polyline" in selected_row and pd.notna(selected_row["Route Polyline"]):
+            show_3d = st.toggle("🗺️ 3D Map View", value=False, key="toggle_3d_map")
+            coords = None
+            try:
+                import polyline
+                coords = polyline.decode(selected_row["Route Polyline"])
+            except Exception as e:
+                st.warning(f"Could not decode route polyline: {e}")
+
+            if coords:
+                if show_3d:
+                    import pydeck as pdk
+                    route_df = pd.DataFrame(coords, columns=["lat", "lon"])
+                    mapbox_api_key = st.secrets.get("MAPBOX_API_KEY", "")
+                    pdk.settings.mapbox_api_key = mapbox_api_key
+
+                    # --- Fetch elevations for each point ---
+                    with st.spinner("Fetching elevation data for 3D route..."):
+                        elevations = fetch_elevations(coords)
+                    # Build [lon, lat, elevation] for PathLayer
+                    path_coords = [[lon, lat, elev] for (lat, lon), elev in zip(coords, elevations)]
+
+                    # TerrainLayer for real 3D terrain
+                    terrain_layer = pdk.Layer(
+                        "TerrainLayer",
+                        data=None,
+                        elevation_decoder={
+                            "rScaler": 256,
+                            "gScaler": 1,
+                            "bScaler": 1/256,
+                            "offset": -32768
+                        },
+                        texture="https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}@2x?access_token=" + mapbox_api_key,
+                        elevation_data="https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+                        bounds=[-180, -85.051129, 180, 85.051129],
+                        wireframe=False,
+                        material=True,
+                    )
+                    # PathLayer for the route (now with elevation)
+                    path_layer = pdk.Layer(
+                        "PathLayer",
+                        [
+                            {
+                                "path": path_coords,
+                                "color": [30, 190, 255],
+                                "width": 6,
+                            }
+                        ],
+                        get_path="path",
+                        get_color="color",
+                        width_scale=5,
+                        width_min_pixels=3,
+                        get_width=6,
+                        opacity=0.9,
+                        pickable=False,
+                        auto_highlight=True,
+                        material=True,
+                    )
+                    midpoint = route_df.iloc[len(route_df)//2]
+                    view_state = pdk.ViewState(
+                        longitude=midpoint["lon"],
+                        latitude=midpoint["lat"],
+                        zoom=14,
+                        pitch=60,
+                        bearing=30,
+                    )
+                    st.pydeck_chart(
+                        pdk.Deck(
+                            layers=[terrain_layer, path_layer],
+                            initial_view_state=view_state,
+                            map_style=None,
+                        ),
+                        width=350,
+                        height=250,
+                    )
+                    map_html = "pydeck"
+                else:
+                    import folium
+                    from streamlit_folium import st_folium
+                    m = folium.Map(location=coords[0], zoom_start=13)
+                    folium.PolyLine(coords, color="blue", weight=3).add_to(m)
+                    map_html = m
+            else:
+                st.warning("No route coordinates available for map rendering.")
+
         lap_df = pd.DataFrame()
         if "Lap Details" in selected_row and pd.notna(selected_row["Lap Details"]):
             try:
+                import matplotlib.pyplot as plt
+                from streamlit_folium import st_folium
                 laps_raw = re.findall(r"Lap (\d+):\s*([^|]+)", selected_row["Lap Details"].replace("\\n", " "))
                 lap_data = []
                 for lap_number, details in laps_raw:
@@ -180,6 +302,19 @@ def render_activities(df):
 
                 lap_df = pd.DataFrame(lap_data)
                 if not lap_df.empty:
+                    # Map display (folium only, not pydeck)
+                    if map_html is not None and map_html != "pydeck":
+                        if mobile_view:
+                            st.markdown("<div style='margin-bottom:1.2rem;border-radius:14px;overflow:hidden;border:2px solid #1EBEFF;'>", unsafe_allow_html=True)
+                            st_folium(map_html, width=350, height=250)
+                            st.markdown("</div>", unsafe_allow_html=True)
+                        else:
+                            st.markdown("<div style='display:flex;gap:1.2rem;margin-bottom:1.2rem;'>", unsafe_allow_html=True)
+                            st.markdown("<div style='flex:1;min-width:350px;border-radius:14px;overflow:hidden;border:2px solid #1EBEFF;'>", unsafe_allow_html=True)
+                            st_folium(map_html, width=350, height=250)
+                            st.markdown("</div>", unsafe_allow_html=True)
+                            st.markdown("<div style='flex:2;'>", unsafe_allow_html=True)
+
                     fig, ax = plt.subplots(figsize=(10, 0.4 * len(lap_df)))
                     bars = ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
 
@@ -206,6 +341,9 @@ def render_activities(df):
                     ax.grid(True, axis='x', linestyle='--', alpha=0.5)
                     ax.set_xlim(0, max(lap_df["Pace"]) + 2)
                     st.pyplot(fig)
+
+                    if map_html is not None and map_html != "pydeck" and not mobile_view:
+                        st.markdown("</div></div>", unsafe_allow_html=True)
 
             except Exception as e:
                 st.warning(f"Could not parse lap details: {e}")
@@ -245,25 +383,37 @@ def render_activities(df):
                     day_str = selected_row['Date'].strftime('%A')
                     date_str = selected_row['Date'].strftime('%Y-%m-%d')
                     name_str = selected_row['Name']
+                    # Gather all relevant fields
+                    Running_Type = selected_row.get("Type", "-")
+                    elapsed_time = selected_row.get("Elapsed Time (min)", "-")
+                    Distance = selected_row.get("Distance (km)", "-")
+                    Pace = selected_row.get("Pace (min/km)", "-")
+                    moving_time = selected_row.get("Moving Time", "-")
+                    cadence = selected_row.get("Cadence", "-")
+                    avg_hr = selected_row.get("Avg HR", "-")
+                    max_hr = selected_row.get("Max HR", "-")
+                    power = selected_row.get("Power (W)", "-")
+                    calories = selected_row.get("Calories", "-")
+                    elevation_gain = selected_row.get("Elevation Gain", "-")
+                    desc = selected_row.get("Description", "-")
                     prompt = (
-                        "Analyze this running activity based on the following data. looks at per lap data as well if available\n"
-                        "Comment on what is the impact of the activity. what is ecexuted good and what needs to be improved \n"
-                        "Comment on general feedback of this activity \n"
-                        "Provide specific, actionable feedback for improvement.\n"
-                        f"Day: {day_str}, Date: {date_str}, Name: {name_str}"
-                        
-                        f"\nRun Summary: {selected_row['Distance (km)']}km, "
-                        f"Avg Pace: {format_pace(selected_row['Pace (min/km)'])}, "
-                        f"Avg HR: {selected_row['Avg HR']}, "
-                        f"Max HR: {selected_row.get('Max HR', '-')}, "
-                        f"Cadence: {selected_row.get('Cadence', '-')}, "
-                        f"Power: {selected_row.get('Power (W)', '-')}, "
-                        f"Calories: {selected_row.get('Calories', '-')}, "
-                        f"Elevation Gain: {selected_row['Elevation Gain']}m, "
-                        f"Day: {day_str}, Date: {date_str}, Name: {name_str}"
+                        "Analyze this running activity based on the following data. Look at per lap data as well if available.\n"
+                        "Comment on what is the impact of the activity, what is executed well, and what needs to be improved.\n"
+                        f"Day: {day_str}, Date: {date_str}, Name: {name_str}\n"
+                        f"Type: {Running_Type}\n"
+                        f"Elapsed Time: {elapsed_time} min\n"
+                        f"Moving Time: {moving_time} min\n"
+                        f"Distance: {Distance} km\n"
+                        f"Pace: {format_pace(Pace) if Pace != '-' else '-'} min/km\n"
+                        f"Cadence: {cadence}\n"
+                        f"Avg HR: {avg_hr}\n"
+                        f"Max HR: {max_hr}\n"
+                        f"Power: {power}\n"
+                        f"Calories: {calories}\n"
+                        f"Elevation Gain: {elevation_gain} m\n"
+                        f"Description: {desc}\n"
                         f"\nLap Data:\n{lap_csv}\n"
-                        
-                        f"\n\nthese are the Runner Profile information: :\n{runner_profile_str}"
+                        f"\n\nThese are the Runner Profile information:\n{runner_profile_str}"
                     )
                     # print (f"AI Prompt \n: {prompt}")
                     with st.spinner("Analyzing your run data..."):
