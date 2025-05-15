@@ -52,8 +52,30 @@ def render_activities(df):
 
     st.markdown("### 🧾 Click a row below to select")
 
-    # Mobile view toggle
-    mobile_view = st.toggle("📱 Mobile View", value=False)
+    # --- Device detection for default mobile view ---
+    if "is_mobile" not in st.session_state:
+        st.markdown("""
+            <script>
+            function isMobile() {
+                return (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+            }
+            window.parent.postMessage({is_mobile: isMobile()}, "*");
+            window.addEventListener("message", (event) => {
+                if (event.data && typeof event.data.is_mobile !== 'undefined') {
+                    window.localStorage.setItem('is_mobile', event.data.is_mobile);
+                }
+            });
+            </script>
+        """, unsafe_allow_html=True)
+        # Try to read from localStorage via Streamlit's query params (best effort)
+        is_mobile = st.query_params.get('is_mobile', [None])[0]
+        if is_mobile is not None:
+            st.session_state['is_mobile'] = (is_mobile == 'true')
+        else:
+            st.session_state['is_mobile'] = False
+
+    # Use detected value for default
+    mobile_view = st.toggle("📱 Mobile View", value=st.session_state.get('is_mobile', False))
 
     # Choose columns for table
     display_columns = (
