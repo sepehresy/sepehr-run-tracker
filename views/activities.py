@@ -57,13 +57,12 @@ def render_activities(df):
     if "is_mobile" not in st.session_state:
         user_agent = st_javascript("window.navigator.userAgent")
         st.write(f"[DEBUG] User agent: {user_agent}")
-        if user_agent:
+        if user_agent is not None:
             is_mobile = any(x in user_agent for x in ["Android", "webOS", "iPhone", "iPad", "iPod", "BlackBerry", "IEMobile", "Opera Mini"])
             st.session_state['is_mobile'] = is_mobile
             st.write(f"[DEBUG] Detected mobile: {is_mobile}")
         else:
-            st.session_state['is_mobile'] = False
-            st.write("[DEBUG] Could not detect user agent, defaulting to desktop mode.")
+            st.write("[DEBUG] User agent not available yet. Please interact with the page or reload if detection fails.")
     else:
         st.write(f"[DEBUG] Cached is_mobile: {st.session_state['is_mobile']}")
 
