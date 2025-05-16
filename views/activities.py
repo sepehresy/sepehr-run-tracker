@@ -197,7 +197,7 @@ def render_activities(df):
                 """, unsafe_allow_html=True
             )
 
-        # Map view if Route Polyline is available
+        # --- Map creation logic (always run before flex row rendering) ---
         map_html = None
         show_3d = False
         if "Route Polyline" in selected_row and pd.notna(selected_row["Route Polyline"]):
@@ -208,21 +208,15 @@ def render_activities(df):
                 coords = polyline.decode(selected_row["Route Polyline"])
             except Exception as e:
                 st.warning(f"Could not decode route polyline: {e}")
-
             if coords:
                 if show_3d:
                     import pydeck as pdk
                     route_df = pd.DataFrame(coords, columns=["lat", "lon"])
                     mapbox_api_key = st.secrets.get("MAPBOX_API_KEY", "")
                     pdk.settings.mapbox_api_key = mapbox_api_key
-
-                    # --- Fetch elevations for each point ---
                     with st.spinner("Fetching elevation data for 3D route..."):
                         elevations = fetch_elevations(coords)
-                    # Build [lon, lat, elevation] for PathLayer
                     path_coords = [[lon, lat, elev] for (lat, lon), elev in zip(coords, elevations)]
-
-                    # TerrainLayer for real 3D terrain
                     terrain_layer = pdk.Layer(
                         "TerrainLayer",
                         data=None,
@@ -238,7 +232,6 @@ def render_activities(df):
                         wireframe=False,
                         material=True,
                     )
-                    # PathLayer for the route (now with elevation)
                     path_layer = pdk.Layer(
                         "PathLayer",
                         [
@@ -282,14 +275,25 @@ def render_activities(df):
                     m = folium.Map(location=coords[0], zoom_start=13)
                     folium.PolyLine(coords, color="blue", weight=3).add_to(m)
                     map_html = m
-            else:
-                st.warning("No route coordinates available for map rendering.")
-
+        # --- Map and Lap Data Layout ---
         lap_df = pd.DataFrame()
+        lap_plot_rendered = False
+        st.markdown("<div style='display:flex;gap:1.2rem;margin-bottom:1.2rem;'>", unsafe_allow_html=True)
+        # Map column
+        st.markdown("<div style='flex:1;min-width:350px;border-radius:14px;overflow:hidden;border:2px solid #1EBEFF;'>", unsafe_allow_html=True)
+        if map_html is not None and map_html != "pydeck":
+            from streamlit_folium import st_folium
+            st_folium(map_html, width=350, height=250)
+        elif map_html == "pydeck":
+            pass  # pydeck already rendered above
+        else:
+            st.markdown("<div style='width:350px;height:250px;background:#232733;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#888;'>No Map</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        # Lap data column
+        st.markdown("<div style='flex:2;'>", unsafe_allow_html=True)
         if "Lap Details" in selected_row and pd.notna(selected_row["Lap Details"]):
             try:
                 import matplotlib.pyplot as plt
-                from streamlit_folium import st_folium
                 laps_raw = re.findall(r"Lap (\d+):\s*([^|]+)", selected_row["Lap Details"].replace("\\n", " "))
                 lap_data = []
                 for lap_number, details in laps_raw:
@@ -309,54 +313,36 @@ def render_activities(df):
                         elif p.startswith("ElevGain"):
                             lap_info["ElevGain"] = float(p.replace("ElevGain", "").strip())
                     lap_data.append(lap_info)
-
                 lap_df = pd.DataFrame(lap_data)
                 if not lap_df.empty:
-                    # Map display (folium only, not pydeck)
-                    if map_html is not None and map_html != "pydeck":
-                        if mobile_view:
-                            st.markdown("<div style='margin-bottom:1.2rem;border-radius:14px;overflow:hidden;border:2px solid #1EBEFF;'>", unsafe_allow_html=True)
-                            st_folium(map_html, width=350, height=250)
-                            st.markdown("</div>", unsafe_allow_html=True)
-                        else:
-                            st.markdown("<div style='display:flex;gap:1.2rem;margin-bottom:1.2rem;'>", unsafe_allow_html=True)
-                            st.markdown("<div style='flex:1;min-width:350px;border-radius:14px;overflow:hidden;border:2px solid #1EBEFF;'>", unsafe_allow_html=True)
-                            st_folium(map_html, width=350, height=250)
-                            st.markdown("</div>", unsafe_allow_html=True)
-                            st.markdown("<div style='flex:2;'>", unsafe_allow_html=True)
-
                     fig, ax = plt.subplots(figsize=(10, 0.4 * len(lap_df)))
                     bars = ax.barh(lap_df.index, lap_df["Pace"], color="#1EBEFF")
-
                     avg_pace = lap_df["Pace"].mean()
                     ax.axvline(x=avg_pace, color="red", linestyle="--", linewidth=1, label=f"Avg Pace: {format_pace(avg_pace)}")
                     ax.legend(loc="lower right")
-
                     ax.text(-5.8, -1, "KM", fontweight='bold')
                     ax.text(-4.8, -1, "Time", fontweight='bold')
                     ax.text(-3.8, -1, "Elev", fontweight='bold')
                     ax.text(-2.8, -1, "HR", fontweight='bold')
                     ax.text(-1.8, -1, "Pace", fontweight='bold')
-
                     for i, row in lap_df.iterrows():
                         ax.text(-5.8, i, f"{row['Distance']:.2f}", va='center', ha='left', fontweight='bold')
                         ax.text(-4.8, i, f"{row['Time']}", va='center', ha='left')
                         ax.text(-3.8, i, f"{int(row['ElevGain'])}", va='center', ha='left')
                         ax.text(-2.8, i, f"{row['HR']}", va='center', ha='left')
                         ax.text(-1.8, i, format_pace(row['Pace']), va='center', ha='left')
-
                     ax.set_yticks([])
                     ax.set_xlabel("Pace (min/km)")
                     ax.invert_yaxis()
                     ax.grid(True, axis='x', linestyle='--', alpha=0.5)
                     ax.set_xlim(0, max(lap_df["Pace"]) + 2)
                     st.pyplot(fig)
-
-                    if map_html is not None and map_html != "pydeck" and not mobile_view:
-                        st.markdown("</div></div>", unsafe_allow_html=True)
-
+                    lap_plot_rendered = True
             except Exception as e:
                 st.warning(f"Could not parse lap details: {e}")
+        if lap_df.empty:
+            st.markdown("<div style='display:flex;align-items:center;justify-content:center;color:#888;'>No lap data available</div>", unsafe_allow_html=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
         st.markdown("---")
 
