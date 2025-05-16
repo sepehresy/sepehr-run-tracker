@@ -9,11 +9,16 @@ import openai
 from utils.gsheet import fetch_gsheet_plan
 from utils.parse_helper import parse_markdown_plan_table, parse_csv_plan_table, load_csv_from_text, parse_training_plan
 import urllib3
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from version import APP_VERSION, APP_VERSION_COLOR, APP_VERSION_STYLE
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 DEBUG_MODE = st.secrets.get("DEBUG_MODE", False)
-print ("DEBUG_MODE:", DEBUG_MODE)
+# print ("DEBUG_MODE:", DEBUG_MODE)
 DEBUG_AI_PLAN_PATH = "data/analyses/ai_plan_debug3.txt"
 
 def load_gist_race_data(user_info, gist_id, filename, token):
@@ -144,93 +149,9 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
     if "plan_edit_meta" not in st.session_state:
         st.session_state["plan_edit_meta"] = {}
 
-    st.markdown("""
-    <style>
-    .race-section {border-radius: 14px; margin-bottom: 28px; background: #fff; box-shadow: 0 2px 16px rgba(30,40,60,0.07); border: 1px solid #e6e6e6;}
-    .race-header {padding: 20px 28px; font-size: 1.3rem; font-weight: 600; color: #1EBEFF; background: #f7fafd; border-radius: 14px 14px 0 0; letter-spacing: 0.5px;}
-    .race-meta {color: #888; font-size: 1.05rem; margin-bottom: 8px;}
-    .race-actions {margin-top: 8px;}
-    .race-divider {border-bottom: 1px solid #f0f0f0; margin: 0 0 18px 0;}
-    .plan-toolbar {margin-bottom: 18px;}
-    .plan-toolbar .stButton>button {margin-right: 12px;}
-    .plan-table {margin-bottom: 18px;}
-    .stButton>button {border-radius: 8px !important; background: #1EBEFF !important; color: #fff !important; border: none !important; font-weight: 500; padding: 8px 18px; transition: background 0.2s;}
-    .stButton>button:hover {background: #009fd9 !important;}
-    .stTextInput>div>input, .stNumberInput>div>input, .stTextArea textarea, .stSelectbox>div>div {
-        border-radius: 8px; border: 1px solid #e6e6e6; background: #23242a !important; color: #e6e6e6 !important; font-size: 1rem;
-    }
-    .stDataFrame, .stDataEditor {background: #f7fafd; border-radius: 10px;}
-    .stExpanderHeader {font-size: 1.1rem; font-weight: 500; color: #1EBEFF;}
-    .stAlert {border-radius: 8px;}
-    .modern-section-header {
-        margin-bottom: 10px;
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: #1EBEFF;
-    }
-    .modern-subheader {
-        margin-bottom: 10px;
-        font-size: 1.15rem;
-        font-weight: 600;
-        color: #1EBEFF;
-    }
-    .modern-hr {
-        margin: 12px 0 18px 0;
-        border: none;
-        border-top: 1px solid #23272f;
-    }
-    .modern-btn-row {
-        margin-top: 10px;
-        margin-bottom: 10px;
-        display: flex;
-        gap: 1.5rem;
-        justify-content: flex-end;
-    }
-    .stTextInput>div>input, .stNumberInput>div>input, .stTextArea textarea, .stSelectbox>div>div, .stMultiSelect>div>div {
-        border-radius: 8px !important;
-        border: 1px solid #23272f !important;
-        background: #18191a !important;
-        color: #e6e6e6 !important;
-        font-size: 1rem !important;
-        padding: 6px 10px !important;
-    }
-    .stButton>button {
-        border-radius: 8px !important;
-        background: #1EBEFF !important;
-        color: #fff !important;
-        border: none !important;
-        font-weight: 500 !important;
-        padding: 8px 18px !important;
-        margin-top: 8px !important;
-        transition: background 0.2s;
-    }
-    .stButton>button:hover {
-        background: #009fd9 !important;
-    }
-    /* Improve selectbox readability for Race type */
-    div[data-baseweb="select"] > div {
-        min-height: 44px !important;
-    }
-    div[data-baseweb="select"] span {
-        color: #fff !important;
-        font-size: 1.08rem !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.2px;
-    }
-    div[data-baseweb="select"] input {
-        color: #fff !important;
-        font-size: 1.08rem !important;
-        font-weight: 600 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    st.sidebar.markdown(f'<div style="position:fixed;bottom:1.5rem;left:0;width:100%;text-align:left;{APP_VERSION_STYLE}color:{APP_VERSION_COLOR};">v{APP_VERSION}</div>', unsafe_allow_html=True)
 
-    st.markdown("""
-    <div style='display:flex;align-items:center;gap:12px;margin-bottom:18px;'>
-        <span style='font-size:2.1rem;'>🏁</span>
-        <span style='font-size:1.7rem;font-weight:600;letter-spacing:0.5px;color:#222;'>Race Planning</span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<span style="font-size:1.5rem;vertical-align:middle;">🎯</span> <span style="font-size:1.25rem;font-weight:600;vertical-align:middle;">Race Planning</span>', unsafe_allow_html=True)
 
     if "add_race_expanded" not in st.session_state:
         st.session_state["add_race_expanded"] = False
@@ -731,7 +652,8 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                         ai_history = []
                     # --- New AI Analysis Button (moved above history) ---
                     if st.button(f"🧠 Run AI Analysis for this race", key=f"ai_analysis_btn_{race_id}"):
-                        print ("butt pressed 1")
+                        # print ("butt pressed 1")
+
                         # Prepare data for AI prompt
                         today_str = str(datetime.today().date())
                         race_date = race.get('date', '')
@@ -755,7 +677,8 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                                 })
                         else:
                             plan_df = pd.DataFrame()
-                        print ("butt 3")
+                        # print ("butt 3")
+
                         chart_df = pd.DataFrame()  # You may want to use actual chart data if available
                         lap_text = ''  # You may want to use actual lap/run data if available
                         # Robustly join summaries from ai_history if it is a list of dicts
@@ -765,15 +688,15 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                             ])
                         else:
                             previous_notes = ''
-                        print ("butt 4")
+                        # print ("butt 4")
                         from views.ai_prompt import generate_ai_prompt
-                        print ("but pressed 2")
+                        # print ("but pressed 2")
                         prompt = generate_ai_prompt(race, today_str, race_date, plan_df, chart_df, lap_text, previous_notes)
-                        print (prompt)
+                        # print (prompt)
                         ai_feedback = None
                         ai_feedback_date = datetime.now().strftime('%Y-%m-%d %H:%M')
                         try:
-                            print (DEBUG_MODE, "    0000 debbbbbbbbbugggg")
+                            # print (DEBUG_MODE, "    0000 debbbbbbbbbugggg")
                             if DEBUG_MODE:
                                 ai_feedback = 'This is a debug AI analysis summary.'
                             else:

@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 import streamlit as st
 
 def generate_ai_prompt(selected_race, today_str, race_date, plan_df, chart_df, lap_text, previous_notes):
+    st.markdown('<span style="font-size:1.5rem;vertical-align:middle;">🤖</span> <span style="font-size:1.25rem;font-weight:600;vertical-align:middle;">AI Prompt</span>', unsafe_allow_html=True)
+    
     progress_csv = chart_df.to_csv(index=False)
     plan_csv = plan_df.to_csv(index=False)
 

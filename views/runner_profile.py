@@ -2,13 +2,19 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 from utils.gist_helpers import load_gist_data
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from version import APP_VERSION, APP_VERSION_COLOR, APP_VERSION_STYLE
 
 def render_runner_profile(user_info, save_user_profile_func):
     # Use the runner profile from session state (which is kept up to date after login and on save)
     profile = st.session_state.get('user_info', {}).get('runner_profile', {})
 
-    st.title("🏃 Runner Profile")
+    st.markdown('<span style="font-size:1.5rem;vertical-align:middle;">🏃</span> <span style="font-size:1.25rem;font-weight:600;vertical-align:middle;">Runner Profile</span>', unsafe_allow_html=True)
     st.markdown("Use this profile to help AI understand your background for a tailored training plan.")
+
+    st.sidebar.markdown(f'<div style="position:fixed;bottom:1.5rem;left:0;width:100%;text-align:left;{APP_VERSION_STYLE}color:{APP_VERSION_COLOR};">v{APP_VERSION}</div>', unsafe_allow_html=True)
 
     with st.form("runner_profile_form"):
 
@@ -33,6 +39,9 @@ def render_runner_profile(user_info, save_user_profile_func):
             if max_hr_val < 100:
                 max_hr_val = 100
             max_hr = col2.number_input("Max HR (bpm)", 100, 220, step=1, value=max_hr_val)
+
+            lthr_val = int(profile.get("LTHR", profile.get("lthr", 165)))
+            lthr = col1.number_input("Lactate Threshold HR (LTHR)", 100, 220, step=1, value=lthr_val, help="Used for TSS and fatigue analysis.")
 
             hr_zones = st.columns(5)
             z1 = hr_zones[0].text_input("Z1 (Recovery)", value=profile.get("z1", ""), placeholder="e.g. 100–120")
@@ -94,6 +103,7 @@ def render_runner_profile(user_info, save_user_profile_func):
                 "marathons": full_count,
                 "resting_hr": resting_hr,
                 "max_hr": max_hr,
+                "LTHR": lthr,
                 "z1": z1,
                 "z2": z2,
                 "z3": z3,

@@ -6,19 +6,21 @@ from views.activities import render_activities
 from views.ai_analysis import render_ai_analysis
 from views.race_planning import render_race_planning
 from views.runner_profile import render_runner_profile
+from views.fatigue_analysis import render_fatigue_analysis
 import requests
 import json
 from utils.gist_helpers import load_gist_data, save_gist_data
 import io
 import certifi
 import urllib3
+from version import APP_VERSION, APP_VERSION_COLOR, APP_VERSION_STYLE
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Set Streamlit app config
 # st.set_page_config(page_title="Sepehr's Running Dashboard", layout="wide", theme={"base": "light"})
 st.set_page_config(page_title="Sepehr's Running Dashboard", layout="wide")
-# st.set_page_config(page_title="Sepehr's Running Dashboard", layout="wide", theme={"base": "dark"})
 
 # --- Authenticate user ---
 def load_users():
@@ -50,7 +52,8 @@ if not st.session_state.user_authenticated:
             st.session_state.user_authenticated = True
             st.session_state.user_info = user_info
             st.session_state.username = username
-            print('LOGIN: runner_profile:', user_info.get('runner_profile', {}))
+            # print('LOGIN: runner_profile:', user_info.get('runner_profile', {}))
+
 
             # After successful login, ensure user's gist file exists and is initialized if needed
             user_key = user_info["USER_KEY"]
@@ -76,7 +79,8 @@ if not st.session_state.user_authenticated:
                             # --- Load latest runner profile from Gist into session state ---
                             runner_profile = content[user_key].get("runner_profile", {})
                             st.session_state.user_info["runner_profile"] = runner_profile
-                            print('LOGIN: loaded runner_profile from Gist:', runner_profile)
+                            # print('LOGIN: loaded runner_profile from Gist:', runner_profile)
+
                     except Exception:
                         needs_init = True
                 if needs_init:
@@ -130,8 +134,11 @@ else:
     today = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Sidebar navigation
-    st.sidebar.title("📁 Dashboard View")
-    view = st.sidebar.radio("Navigate to:", ["📊 Summary", "📂 Activities", "🏁 Race Planning", "🧠 AI Analysis", "🧍 Runner Profile"])
+    # st.sidebar.title("📁 Dashboard View")
+    view = st.sidebar.radio("Navigate to:", ["📊 Summary", "📂 Activities", "🏁 Race Planning", "🧠 AI Analysis", "🧍 Runner Profile", "📊 Fatigue Analysis"])
+
+    st.sidebar.markdown(f'<div style="position:fixed;bottom:1.5rem;left:0;width:100%;text-align:left;{APP_VERSION_STYLE}color:{APP_VERSION_COLOR};">v{APP_VERSION}</div>', unsafe_allow_html=True)
+
 
     def save_user_profile_func(new_profile):
         data = load_gist_data(gist_id, gist_filename, github_token)
@@ -158,3 +165,6 @@ else:
 
     elif view == "🧍 Runner Profile":
         render_runner_profile(user_info, save_user_profile_func)
+
+    elif view == "📊 Fatigue Analysis":
+        render_fatigue_analysis(df, today)

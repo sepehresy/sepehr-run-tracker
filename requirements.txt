@@ -1,7 +1,12 @@
-streamlit>=1.12.0
+streamlit
 pandas
 numpy
 matplotlib
 openai
 streamlit-aggrid
+streamlit-elements
+polyline
+streamlit-folium
+streamlit-javascript
+plotly
 
