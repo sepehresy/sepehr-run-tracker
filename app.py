@@ -6,12 +6,14 @@ from views.activities import render_activities
 from views.ai_analysis import render_ai_analysis
 from views.race_planning import render_race_planning
 from views.runner_profile import render_runner_profile
+from views.fatigue_analysis import render_fatigue_analysis
 import requests
 import json
 from utils.gist_helpers import load_gist_data, save_gist_data
 import io
 import certifi
 import urllib3
+from version import APP_VERSION, APP_VERSION_COLOR, APP_VERSION_STYLE
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -129,8 +131,10 @@ else:
     today = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Sidebar navigation
-    st.sidebar.title("📁 Dashboard View")
-    view = st.sidebar.radio("Navigate to:", ["📊 Summary", "📂 Activities", "🏁 Race Planning", "🧠 AI Analysis", "🧍 Runner Profile"])
+    # st.sidebar.title("📁 Dashboard View")
+    view = st.sidebar.radio("Navigate to:", ["📊 Summary", "📂 Activities", "🏁 Race Planning", "🧠 AI Analysis", "🧍 Runner Profile", "📊 Fatigue Analysis"])
+
+    st.sidebar.markdown(f'<div style="position:fixed;bottom:1.5rem;left:0;width:100%;text-align:left;{APP_VERSION_STYLE}color:{APP_VERSION_COLOR};">v{APP_VERSION}</div>', unsafe_allow_html=True)
 
     def save_user_profile_func(new_profile):
         data = load_gist_data(gist_id, gist_filename, github_token)
@@ -157,3 +161,6 @@ else:
 
     elif view == "🧍 Runner Profile":
         render_runner_profile(user_info, save_user_profile_func)
+
+    elif view == "📊 Fatigue Analysis":
+        render_fatigue_analysis(df, today)

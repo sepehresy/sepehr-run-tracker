@@ -3,13 +3,20 @@ import pandas as pd
 import altair as alt
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from version import APP_VERSION, APP_VERSION_COLOR, APP_VERSION_STYLE
 
 def render_summary(df, today):
-    st.title("🏃 Summary Statistics (v0.0.2 Beta)")
+    st.sidebar.markdown(f'<div style="position:fixed;bottom:1.5rem;left:0;width:100%;text-align:left;{APP_VERSION_STYLE}color:{APP_VERSION_COLOR};">v{APP_VERSION}</div>', unsafe_allow_html=True)
+
+    st.markdown('<span style="font-size:1.5rem;vertical-align:middle;">🏃</span> <span style="font-size:1.25rem;font-weight:600;vertical-align:middle;">Summary Statistics</span>', unsafe_allow_html=True)
 
     view_option = st.radio(
         "Select View",
         ["Weekly", "4 Weeks", "3 Months", "6 Months", "1 Year", "All (monthly)", "All Yearly"],
+        index=2,  # Default to '3 Months'
         horizontal=True
     )
 
@@ -66,7 +73,7 @@ def render_summary(df, today):
         chart_style = st.selectbox(
             "Chart Style",
             ["Bar", "Bar + Line", "Line + Dots", "Area + Dots"],
-            index=1,  # Default to Bar + Line
+            index=3,  # Default to Area + Dots
             key="chart_style_select"
         )
 
@@ -353,7 +360,7 @@ def render_summary(df, today):
     elif chart_style == "Line + Dots":
         chart = base.mark_line(strokeWidth=2) + base.mark_point(filled=True, size=70)
     elif chart_style == "Area + Dots":
-        chart = base.mark_area(opacity=0.5, interpolate="monotone") + base.mark_point(filled=True, size=70)
+        chart = base.mark_area(opacity=0.5, interpolate="linear") + base.mark_point(filled=True, size=70)
 
     # Add value annotations on top of bars/points
     annotation = alt.Chart(df_agg).mark_text(

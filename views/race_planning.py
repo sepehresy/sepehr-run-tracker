@@ -9,6 +9,10 @@ import openai
 from utils.gsheet import fetch_gsheet_plan
 from utils.parse_helper import parse_markdown_plan_table, parse_csv_plan_table, load_csv_from_text, parse_training_plan
 import urllib3
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from version import APP_VERSION, APP_VERSION_COLOR, APP_VERSION_STYLE
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -144,93 +148,9 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
     if "plan_edit_meta" not in st.session_state:
         st.session_state["plan_edit_meta"] = {}
 
-    st.markdown("""
-    <style>
-    .race-section {border-radius: 14px; margin-bottom: 28px; background: #fff; box-shadow: 0 2px 16px rgba(30,40,60,0.07); border: 1px solid #e6e6e6;}
-    .race-header {padding: 20px 28px; font-size: 1.3rem; font-weight: 600; color: #1EBEFF; background: #f7fafd; border-radius: 14px 14px 0 0; letter-spacing: 0.5px;}
-    .race-meta {color: #888; font-size: 1.05rem; margin-bottom: 8px;}
-    .race-actions {margin-top: 8px;}
-    .race-divider {border-bottom: 1px solid #f0f0f0; margin: 0 0 18px 0;}
-    .plan-toolbar {margin-bottom: 18px;}
-    .plan-toolbar .stButton>button {margin-right: 12px;}
-    .plan-table {margin-bottom: 18px;}
-    .stButton>button {border-radius: 8px !important; background: #1EBEFF !important; color: #fff !important; border: none !important; font-weight: 500; padding: 8px 18px; transition: background 0.2s;}
-    .stButton>button:hover {background: #009fd9 !important;}
-    .stTextInput>div>input, .stNumberInput>div>input, .stTextArea textarea, .stSelectbox>div>div {
-        border-radius: 8px; border: 1px solid #e6e6e6; background: #23242a !important; color: #e6e6e6 !important; font-size: 1rem;
-    }
-    .stDataFrame, .stDataEditor {background: #f7fafd; border-radius: 10px;}
-    .stExpanderHeader {font-size: 1.1rem; font-weight: 500; color: #1EBEFF;}
-    .stAlert {border-radius: 8px;}
-    .modern-section-header {
-        margin-bottom: 10px;
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: #1EBEFF;
-    }
-    .modern-subheader {
-        margin-bottom: 10px;
-        font-size: 1.15rem;
-        font-weight: 600;
-        color: #1EBEFF;
-    }
-    .modern-hr {
-        margin: 12px 0 18px 0;
-        border: none;
-        border-top: 1px solid #23272f;
-    }
-    .modern-btn-row {
-        margin-top: 10px;
-        margin-bottom: 10px;
-        display: flex;
-        gap: 1.5rem;
-        justify-content: flex-end;
-    }
-    .stTextInput>div>input, .stNumberInput>div>input, .stTextArea textarea, .stSelectbox>div>div, .stMultiSelect>div>div {
-        border-radius: 8px !important;
-        border: 1px solid #23272f !important;
-        background: #18191a !important;
-        color: #e6e6e6 !important;
-        font-size: 1rem !important;
-        padding: 6px 10px !important;
-    }
-    .stButton>button {
-        border-radius: 8px !important;
-        background: #1EBEFF !important;
-        color: #fff !important;
-        border: none !important;
-        font-weight: 500 !important;
-        padding: 8px 18px !important;
-        margin-top: 8px !important;
-        transition: background 0.2s;
-    }
-    .stButton>button:hover {
-        background: #009fd9 !important;
-    }
-    /* Improve selectbox readability for Race type */
-    div[data-baseweb="select"] > div {
-        min-height: 44px !important;
-    }
-    div[data-baseweb="select"] span {
-        color: #fff !important;
-        font-size: 1.08rem !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.2px;
-    }
-    div[data-baseweb="select"] input {
-        color: #fff !important;
-        font-size: 1.08rem !important;
-        font-weight: 600 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    st.sidebar.markdown(f'<div style="position:fixed;bottom:1.5rem;left:0;width:100%;text-align:left;{APP_VERSION_STYLE}color:{APP_VERSION_COLOR};">v{APP_VERSION}</div>', unsafe_allow_html=True)
 
-    st.markdown("""
-    <div style='display:flex;align-items:center;gap:12px;margin-bottom:18px;'>
-        <span style='font-size:2.1rem;'>🏁</span>
-        <span style='font-size:1.7rem;font-weight:600;letter-spacing:0.5px;color:#222;'>Race Planning</span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<span style="font-size:1.5rem;vertical-align:middle;">🎯</span> <span style="font-size:1.25rem;font-weight:600;vertical-align:middle;">Race Planning</span>', unsafe_allow_html=True)
 
     if "add_race_expanded" not in st.session_state:
         st.session_state["add_race_expanded"] = False

@@ -10,12 +10,16 @@ import requests
 from utils.elevation import fetch_elevations
 from streamlit_javascript import st_javascript
 
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from version import APP_VERSION, APP_VERSION_COLOR, APP_VERSION_STYLE
+
 try:
     from streamlit_elements import elements, mui, html, sync, lazy, dashboard
     STREAMLIT_ELEMENTS_AVAILABLE = True
-    print ("true", STREAMLIT_ELEMENTS_AVAILABLE)
+    # print ("true", STREAMLIT_ELEMENTS_AVAILABLE)
 except ImportError:
-    print ("false", STREAMLIT_ELEMENTS_AVAILABLE)
+    # print ("false", STREAMLIT_ELEMENTS_AVAILABLE)
     STREAMLIT_ELEMENTS_AVAILABLE = False
 
 # Create analyses directory if it doesn't exist
@@ -45,7 +49,9 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 def render_activities(df):
     global STREAMLIT_ELEMENTS_AVAILABLE
-    st.title("📋 Activities")
+    st.markdown('<span style="font-size:1.5rem;vertical-align:middle;">📋</span> <span style="font-size:1.25rem;font-weight:600;vertical-align:middle;">Activities</span>', unsafe_allow_html=True)
+
+    st.sidebar.markdown(f'<div style="position:fixed;bottom:1.5rem;left:0;width:100%;text-align:left;{APP_VERSION_STYLE}color:{APP_VERSION_COLOR};">v{APP_VERSION}</div>', unsafe_allow_html=True)
 
     # Sort and reset index for consistent row selection
     sorted_df = df.sort_values("Date", ascending=False).reset_index(drop=True)
@@ -54,21 +60,10 @@ def render_activities(df):
     st.markdown("### 🧾 Click a row below to select")
 
     # --- Device detection for default mobile view ---
-    if "is_mobile" not in st.session_state:
-        user_agent = st_javascript("window.navigator.userAgent")
-        st.write(f"[DEBUG] User agent: {user_agent}")
-        if user_agent is not None:
-            is_mobile = any(x in user_agent for x in ["Android", "webOS", "iPhone", "iPad", "iPod", "BlackBerry", "IEMobile", "Opera Mini"])
-            st.session_state['is_mobile'] = is_mobile
-            st.write(f"[DEBUG] Detected mobile: {is_mobile}")
-        else:
-            st.write("[DEBUG] User agent not available yet. Please interact with the page or reload if detection fails.")
-    else:
-        st.write(f"[DEBUG] Cached is_mobile: {st.session_state['is_mobile']}")
-
-    # Use detected value for default
+    # This logic is now handled in the main app (app.py). Use st.session_state['is_mobile'] if set, else default to False.
+    if 'is_mobile' not in st.session_state:
+        st.session_state['is_mobile'] = False
     mobile_view = st.toggle("📱 Mobile View", value=st.session_state.get('is_mobile', False))
-    st.write(f"[DEBUG] Mobile view toggle value: {mobile_view}")
 
     # Choose columns for table
     display_columns = (
@@ -472,4 +467,6 @@ def render_activities(df):
             st.info("Click 'Generate Analysis' for AI insights on this run")
     else:
         st.info("Select an activity from the table above to view splits and analysis.")
+
+
 
