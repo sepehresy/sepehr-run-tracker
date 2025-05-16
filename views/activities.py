@@ -105,7 +105,126 @@ def render_summary_metrics(selected_row):
     day_str = selected_row['Date'].strftime('%A')
     date_str = selected_row['Date'].strftime('%Y-%m-%d')
     name_str = selected_row['Name']
-    st.text(f"{day_str}  -- {date_str} -- {name_str}")
+    
+    
+    # Use 8 columns for a more compact layout
+    cols = st.columns(8)
+    
+    # Custom CSS for smaller metrics
+    st.markdown("""
+    <style>
+    .small-metric {
+        font-size: 0.9rem !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .small-metric .metric-label {
+        font-size: 0.8rem !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .small-metric .metric-value {
+        font-size: 0.8rem !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+      # Unified box with header and metrics in a nice container
+    box_style = """
+    <style>
+    .activity-box {
+        border: 1px solid rgba(49, 51, 63, 0.2);
+        border-radius: 6px;
+        padding: 8px;
+        margin-bottom: 10px;
+        background-color: rgba(49, 51, 63, 0.05);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.07);
+    }
+    .activity-header {
+        font-size: 0.85rem;
+        margin-bottom: 3px;
+        padding-bottom: 3px;
+        border-bottom: 1px solid rgba(49, 51, 63, 0.1);
+    }
+    .activity-description {
+        font-size: 0.75rem;
+        margin: 4px 0;
+        color: rgba(250,250,250,0.8);
+    }
+    .metrics-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 5px;
+    }
+    .metric-card {
+        flex: 1;
+        min-width: 70px;
+        padding: 4px;
+        border-radius: 4px;
+        background-color: rgba(49, 51, 63, 0.15);
+        text-align: center;
+    }
+    .metric-label {
+        font-size: 0.65rem;
+        opacity: 0.75;
+    }
+    .metric-value {
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
+    </style>
+    """
+    
+    summary_html = f"""
+    {box_style}
+    <div class="activity-box">
+        <div class="activity-header">
+            {day_str} — {date_str} — {name_str}
+        </div>
+        <div class="activity-description">
+            <span style="opacity:0.8;">📝</span> {selected_row.get('Description', '-')}
+        </div>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">🏃‍♂️ Distance</div>
+                <div class="metric-value">{selected_row.get('Distance (km)', '-')} km</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">⚡ Pace</div>
+                <div class="metric-value">{format_pace(selected_row.get("Pace (min/km)", "-"))}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">⏳ Time</div>
+                <div class="metric-value">{selected_row.get('Elapsed Time (min)', '-')} min</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">🏔️ Elevation</div>
+                <div class="metric-value">{selected_row.get('Elevation Gain', '-')} m</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">👟 Cadence</div>
+                <div class="metric-value">{selected_row.get('Cadence', '-')}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">❤️ Avg HR</div>
+                <div class="metric-value">{selected_row.get('Avg HR', '-')}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">💖 Max HR</div>
+                <div class="metric-value">{selected_row.get('Max HR', '-')}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">🔥 Calories</div>
+                <div class="metric-value">{selected_row.get('Calories', '-')}</div>
+            </div>
+        </div>
+    </div>
+    """
+    st.markdown(summary_html, unsafe_allow_html=True)
+    
+
 
 def render_map(selected_row):
     if "Route Polyline" in selected_row and pd.notna(selected_row["Route Polyline"]):
@@ -145,7 +264,7 @@ def render_lap_chart(selected_row):
                         lap_info["ElevGain"] = float(p.replace("ElevGain", "").strip())
                 lap_data.append(lap_info)
             lap_df = pd.DataFrame(lap_data)
-            print (lap_df)
+            # print (lap_df)
             if not lap_df.empty:
                 # Set a fixed width for the chart and ensure enough space for 5 columns of text
                 fig_width = 9  # wider than before
