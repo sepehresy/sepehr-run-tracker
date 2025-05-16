@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 from utils.gist_helpers import load_gist_data
-
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))

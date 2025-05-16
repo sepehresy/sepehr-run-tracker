@@ -14,6 +14,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from version import APP_VERSION, APP_VERSION_COLOR, APP_VERSION_STYLE
 
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 DEBUG_MODE = st.secrets.get("DEBUG_MODE", False)
@@ -652,6 +653,7 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                     # --- New AI Analysis Button (moved above history) ---
                     if st.button(f"🧠 Run AI Analysis for this race", key=f"ai_analysis_btn_{race_id}"):
                         # print ("butt pressed 1")
+
                         # Prepare data for AI prompt
                         today_str = str(datetime.today().date())
                         race_date = race.get('date', '')
@@ -676,6 +678,7 @@ def render_race_planning(df, today, user_info, gist_id, gist_filename, github_to
                         else:
                             plan_df = pd.DataFrame()
                         # print ("butt 3")
+
                         chart_df = pd.DataFrame()  # You may want to use actual chart data if available
                         lap_text = ''  # You may want to use actual lap/run data if available
                         # Robustly join summaries from ai_history if it is a list of dicts

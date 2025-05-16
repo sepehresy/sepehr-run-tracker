@@ -23,6 +23,7 @@ try:
 except ImportError:
     STREAMLIT_ELEMENTS_AVAILABLE = False
 
+
 # Create analyses directory if it doesn't exist
 os.makedirs("data/analyses", exist_ok=True)
 
@@ -291,6 +292,3 @@ def render_activities(df):
         render_ai_analysis(selected)
     else:
         st.info("Please select an activity.")
-
-
-
