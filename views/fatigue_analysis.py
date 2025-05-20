@@ -4,8 +4,57 @@ import altair as alt
 from datetime import timedelta
 import sys
 import os
+import json
+from openai import OpenAI
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from version import APP_VERSION, APP_VERSION_COLOR, APP_VERSION_STYLE
+from utils.gist_helpers import load_gist_data, save_gist_data
+
+# Initialize OpenAI client
+try:
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+except Exception:
+    client = None
+
+# Function to load saved fatigue analyses from user's gist
+def load_saved_fatigue_analyses(user_info, gist_id, filename, token):
+    data = load_gist_data(gist_id, filename, token)
+    user_key = user_info["USER_KEY"]
+    
+    # Ensure user data structure exists
+    if user_key not in data:
+        data[user_key] = {}
+    
+    # Ensure fatigue_analyses key exists
+    if "fatigue_analyses" not in data[user_key]:
+        data[user_key]["fatigue_analyses"] = {}
+        
+    return data[user_key].get("fatigue_analyses", {})
+
+# Function to save fatigue analyses to user's gist
+def save_fatigue_analysis(key, content, user_info, gist_id, filename, token):
+    try:
+        # Get the current data
+        data = load_gist_data(gist_id, filename, token)
+        user_key = user_info["USER_KEY"]
+        
+        # Ensure user data structure exists
+        if user_key not in data:
+            data[user_key] = {}
+            
+        # Ensure fatigue_analyses key exists
+        if "fatigue_analyses" not in data[user_key]:
+            data[user_key]["fatigue_analyses"] = {}
+            
+        # Update the fatigue analysis
+        data[user_key]["fatigue_analyses"][key] = content
+        
+        # Save the updated data
+        success = save_gist_data(gist_id, filename, token, data)
+        return success
+    except Exception as e:
+        st.error(f"Error saving fatigue analysis: {e}")
+        return False
 
 def calculate_tss(duration_hrs, intensity_factor):
     return duration_hrs * (intensity_factor ** 2) * 100
@@ -33,7 +82,88 @@ def calculate_atl_ctl_tsb(df, atl_days=7, ctl_days=42):
     df["TSB"] = df["CTL"] - df["ATL"]
     return df
 
-def render_fatigue_analysis(df, today):
+def generate_fatigue_prompt(df, runner_profile, fatigue_metrics, selected_range, today):
+    """
+    Generate a prompt for the AI to analyze fatigue metrics and provide training recommendations.
+    
+    Parameters:
+    - df: DataFrame containing activity data
+    - runner_profile: Dict of runner profile information
+    - fatigue_metrics: Dict of current fatigue metrics (ATL, CTL, TSB)
+    - selected_range: String indicating the time range being analyzed
+    - today: Current date
+    
+    Returns:
+    - String containing the formatted prompt for OpenAI
+    """
+    # Get the last 10 activities for context
+    recent_activities = df.sort_values("Date", ascending=False).head(10).sort_values("Date")
+    
+    # Format recent activities
+    activities_str = ""
+    for _, row in recent_activities.iterrows():
+        date_str = row['Date'].strftime('%Y-%m-%d')
+        name = row.get('Name', 'Unknown')
+        distance = row.get('Distance (km)', '-')
+        tss = row.get('TSS', '-')
+        activities_str += f"Date: {date_str}, Name: {name}, Distance: {distance}km, TSS: {tss}\n"
+    
+    # Format runner experience info
+    experience_level = runner_profile.get('experience', 'Unknown')
+    running_years = runner_profile.get('years_running', 'Unknown')
+    avg_weekly_km = runner_profile.get('avg_weekly_km', 'Unknown')
+    
+    # Format PRs
+    pr_5k = runner_profile.get('pr_5k', '-')
+    pr_10k = runner_profile.get('pr_10k', '-')
+    pr_half = runner_profile.get('pr_half', '-')
+    pr_full = runner_profile.get('pr_marathon', '-')
+    
+    # Format heart rate data
+    resting_hr = runner_profile.get('resting_hr', '-')
+    max_hr = runner_profile.get('max_hr', '-')
+    lthr = runner_profile.get('LTHR', '-')
+    
+    # Format current fatigue metrics
+    current_atl = fatigue_metrics.get('ATL', '-')
+    current_ctl = fatigue_metrics.get('CTL', '-')
+    current_tsb = fatigue_metrics.get('TSB', '-')
+    
+    # Check for injuries
+    injuries = runner_profile.get('injuries', 'None reported')
+    
+    # Create the prompt
+    prompt = f"""
+As an expert running coach, analyze this runner's fatigue metrics and provide tailored advice.
+
+RUNNER PROFILE:
+- Experience: {experience_level} runner with {running_years} years of running
+- Average weekly volume: {avg_weekly_km} km
+- Personal Records: 5K: {pr_5k}, 10K: {pr_10k}, Half: {pr_half}, Marathon: {pr_full}
+- Heart Rate Data: Resting: {resting_hr}, Max: {max_hr}, LTHR: {lthr}
+- Injuries/Limitations: {injuries}
+
+CURRENT FATIGUE METRICS ({today.strftime('%Y-%m-%d')}):
+- CTL (Fitness): {current_ctl:.1f}
+- ATL (Fatigue): {current_atl:.1f}
+- TSB (Form): {current_tsb:.1f}
+- Time Range Analyzed: {selected_range}
+
+RECENT ACTIVITIES (LAST 10):
+{activities_str}
+
+QUESTIONS TO ANSWER:
+1. What do the current CTL, ATL, and TSB values indicate about this runner's training status?
+2. Is there evidence of overtraining or undertraining?
+3. What's the ideal training approach for the next 7-14 days based on these metrics?
+4. When would be an optimal time for a race or peak performance based on these trends?
+5. Are there any warning signs or areas of concern in the data?
+
+Please provide specific, actionable recommendations tailored to this runner's experience level and current fatigue state.
+"""
+    return prompt
+
+def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github_token):
     st.markdown('<span style="font-size:1.5rem;vertical-align:middle;">📊</span> <span style="font-size:1.25rem;font-weight:600;vertical-align:middle;">Fatigue Analysis</span>', unsafe_allow_html=True)
 
     
@@ -252,8 +382,128 @@ def render_fatigue_analysis(df, today):
     
     # --- Daily TSS Table (Collapsible) ---
     with st.expander("Show Daily TSS Table"):
-        st.dataframe(df[["Date", "TSS", "ATL", "CTL", "TSB"]].sort_values("Date", ascending=False), use_container_width=True)
-
-    # --- Insights Section (Placeholder for AI) ---
-    st.markdown("#### Predictive Insights (Coming Soon)")
-    st.info("AI-driven suggestions and peak prediction will appear here.")
+        st.dataframe(df[["Date", "TSS", "ATL", "CTL", "TSB"]].sort_values("Date", ascending=False), use_container_width=True)    # --- AI-Powered Fatigue Insights Section ---
+    st.markdown("#### 🧠 AI Fatigue Analysis & Training Recommendations")
+    
+    # Create a unique key for this analysis based on date range and latest data
+    if not df.empty:
+        latest_date = df['Date'].max().strftime('%Y-%m-%d')
+        analysis_key = f"fatigue_analysis_{latest_date}_{selected_range}"
+        
+        # Get current values for prompt
+        latest = df.iloc[-1]
+        current_fatigue_metrics = {
+            'ATL': latest['ATL'],
+            'CTL': latest['CTL'], 
+            'TSB': latest['TSB']
+        }
+          # Load saved analyses from user's gist
+        saved_analyses = load_saved_fatigue_analyses(user_info, gist_id, gist_filename, github_token)
+        
+        # Check if AI features are enabled for this user
+        features = user_info.get('Features', []) or user_info.get('features', [])
+        if isinstance(features, str):
+            try:
+                features = json.loads(features)
+            except Exception:
+                features = []
+        ai_enabled = 'ai' in features
+        
+        # Create UI for generating and displaying analysis
+        col1, col2 = st.columns([1, 4])
+        
+        with col1:
+            if ai_enabled and client:
+                if st.button("🔄 Generate Insights", key=f"button_{analysis_key}"):
+                    runner_profile = user_info.get('runner_profile', {})
+                    prompt = generate_fatigue_prompt(df, runner_profile, current_fatigue_metrics, selected_range, today)
+                    
+                    with st.spinner("Analyzing your training data..."):
+                        try:
+                            response = client.chat.completions.create(
+                                model="gpt-4-turbo",
+                                messages=[
+                                    {"role": "system", "content": "You are an elite running coach with expertise in analyzing fatigue and training metrics. Your analysis is evidence-based, practical, and personalized to each runner's current state."},
+                                    {"role": "user", "content": prompt}
+                                ]
+                            )
+                            analysis_content = response.choices[0].message.content
+                            st.session_state[analysis_key] = analysis_content
+                            save_success = save_fatigue_analysis(analysis_key, analysis_content, user_info, gist_id, gist_filename, github_token)
+                            if save_success:
+                                st.toast("Fatigue analysis complete!", icon="✅")
+                        except Exception as e:
+                            st.error(f"Error generating fatigue analysis: {e}")
+            else:
+                if not client:
+                    st.button("Generate Insights (API Key Missing)", disabled=True, 
+                             help="OpenAI API key is missing. Please configure it in the app secrets.")
+                else:
+                    st.button("Generate Insights (Locked)", disabled=True, 
+                             help="You do not have access to AI features.")
+        
+        with col2:
+            if analysis_key in saved_analyses or analysis_key in st.session_state:
+                if st.button("🗑️ Delete Analysis", key=f"delete_{analysis_key}"):
+                    if analysis_key in st.session_state:
+                        del st.session_state[analysis_key]
+                    if analysis_key in saved_analyses:
+                        # Delete from gist
+                        data = load_gist_data(gist_id, gist_filename, github_token)
+                        user_key = user_info["USER_KEY"]
+                        if user_key in data and "fatigue_analyses" in data[user_key] and analysis_key in data[user_key]["fatigue_analyses"]:
+                            del data[user_key]["fatigue_analyses"][analysis_key]
+                            save_gist_data(gist_id, gist_filename, github_token, data)
+                        st.rerun()
+          # Display the analysis with nice formatting if available
+        if analysis_key in st.session_state:
+            st.markdown("""
+            <style>
+            .fatigue-analysis {
+                background: rgba(49, 51, 63, 0.1);
+                border-radius: 8px;
+                padding: 15px;
+                margin-top: 10px;
+                border-left: 4px solid #FFD600;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            st.markdown(f'<div class="fatigue-analysis">{st.session_state[analysis_key]}</div>', unsafe_allow_html=True)
+            
+        elif analysis_key in saved_analyses:
+            st.session_state[analysis_key] = saved_analyses[analysis_key]
+            st.markdown("""
+            <style>
+            .fatigue-analysis {
+                background: rgba(49, 51, 63, 0.1);
+                border-radius: 8px;
+                padding: 15px;
+                margin-top: 10px;
+                border-left: 4px solid #FFD600;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            st.markdown(f'<div class="fatigue-analysis">{saved_analyses[analysis_key]}</div>', unsafe_allow_html=True)
+            
+        else:
+            st.info("Generate AI insights to see personalized recommendations based on your fatigue metrics.")
+            
+            # Show sample insights topics
+            st.markdown("""
+            <div style="margin-top:10px;">
+                <details>
+                    <summary style="cursor:pointer;color:#888;font-size:0.9rem;">What insights will I get?</summary>
+                    <ul style="font-size:0.85rem;color:#888;">
+                        <li>Analysis of your current fitness vs. fatigue balance</li>
+                        <li>Early warning signs of overtraining</li>
+                        <li>Recommendations for adjusting training intensity</li>
+                        <li>Optimal timing for peak performance</li>
+                        <li>Recovery strategies based on your metrics</li>
+                    </ul>
+                </details>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.warning("No training data available. Add activities to see AI fatigue insights.")

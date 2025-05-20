@@ -158,8 +158,8 @@ else:
         render_activities(df)
 
     elif view == "🏁 Race Planning":
-        render_race_planning(df, today, user_info, gist_id, gist_filename, github_token)
-
+        render_race_planning(df, today, user_info, gist_id, gist_filename, github_token)    
+        
     elif view == "🧠 AI Analysis":
         render_ai_analysis(df, today)
 
@@ -167,4 +167,4 @@ else:
         render_runner_profile(user_info, save_user_profile_func)
 
     elif view == "📊 Fatigue Analysis":
-        render_fatigue_analysis(df, today)
+        render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github_token)
