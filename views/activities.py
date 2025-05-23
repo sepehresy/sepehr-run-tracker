@@ -12,6 +12,10 @@ from streamlit_javascript import st_javascript
 import folium
 from streamlit_folium import st_folium
 import polyline
+from utils.gist_helpers import load_gist_data, save_gist_data
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -24,9 +28,6 @@ except ImportError:
     STREAMLIT_ELEMENTS_AVAILABLE = False
 
 
-# Create analyses directory if it doesn't exist
-os.makedirs("data/analyses", exist_ok=True)
-
 def format_pace(p):
     try:
         p = float(p)
@@ -36,24 +37,46 @@ def format_pace(p):
     except:
         return "-"
 
-# Function to load saved analyses
-def load_saved_analyses():
+# Function to load saved analyses from Gist
+def load_saved_analyses(user_info, gist_id, filename, token):
     try:
-        with open("data/analyses/saved_analyses.json", "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+        data = load_gist_data(gist_id, filename, token)
+        user_key = user_info["USER_KEY"]
+        if user_key not in data:
+            data[user_key] = {"races": [], "training_plans": {}, "progress_feedback": {}, "activity_analyses": {}}
+        return data[user_key].get("activity_analyses", {})
+    except Exception as e:
+        st.error(f"Error loading analyses: {e}")
         return {}
 
-# Function to save analyses
-def save_analysis(key, content):
+# Function to save analyses to Gist
+def save_analysis(key, content, user_info, gist_id, filename, token):
     try:
-        analyses = load_saved_analyses()
-        analyses[key] = content
-        with open("data/analyses/saved_analyses.json", "w") as f:
-            json.dump(analyses, f)
+        data = load_gist_data(gist_id, filename, token)
+        user_key = user_info["USER_KEY"]
+        if user_key not in data:
+            data[user_key] = {"races": [], "training_plans": {}, "progress_feedback": {}, "activity_analyses": {}}
+        
+        data[user_key].setdefault("activity_analyses", {})
+        data[user_key]["activity_analyses"][key] = content
+        
+        save_gist_data(gist_id, filename, token, data)
         return True
     except Exception as e:
         st.error(f"Error saving analysis: {e}")
+        return False
+
+# Function to delete analysis from Gist
+def delete_analysis(key, user_info, gist_id, filename, token):
+    try:
+        data = load_gist_data(gist_id, filename, token)
+        user_key = user_info["USER_KEY"]
+        if user_key in data and "activity_analyses" in data[user_key]:
+            data[user_key]["activity_analyses"].pop(key, None)
+            save_gist_data(gist_id, filename, token, data)
+        return True
+    except Exception as e:
+        st.error(f"Error deleting analysis: {e}")
         return False
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -544,7 +567,7 @@ def render_ai_analysis(row):
     st.markdown('<div class="section-header"><span class="section-icon">🧠</span> <span class="section-title">AI Analysis of This Run</span></div>', unsafe_allow_html=True)
     
     activity_key = f"analysis_{row['Date']}_{row['Name']}"
-    saved_analyses = load_saved_analyses()
+    saved_analyses = load_saved_analyses(st.session_state.get('user_info', {}), st.session_state.get('gist_id', ''), st.session_state.get('filename', ''), st.session_state.get('token', ''))
     user_info = st.session_state.get('user_info', {})
     features = user_info.get('Features', []) or user_info.get('features', [])
     if isinstance(features, str):
@@ -574,7 +597,7 @@ def render_ai_analysis(row):
                         )
                         analysis_content = response.choices[0].message.content
                         st.session_state[activity_key] = analysis_content
-                        save_success = save_analysis(activity_key, analysis_content)
+                        save_success = save_analysis(activity_key, analysis_content, user_info, st.session_state.get('gist_id', ''), st.session_state.get('filename', ''), st.session_state.get('token', ''))
                         if save_success:
                             st.toast("Analysis complete!", icon="✅")
                     except Exception as e:
@@ -587,10 +610,9 @@ def render_ai_analysis(row):
                 if activity_key in st.session_state:
                     del st.session_state[activity_key]
                 if activity_key in saved_analyses:
-                    saved_analyses.pop(activity_key)
-                    with open("data/analyses/saved_analyses.json", "w") as f:
-                        json.dump(saved_analyses, f)
-                    st.rerun()
+                    delete_success = delete_analysis(activity_key, user_info, st.session_state.get('gist_id', ''), st.session_state.get('filename', ''), st.session_state.get('token', ''))
+                    if delete_success:
+                        st.rerun()
     if activity_key in st.session_state:
         st.write(st.session_state[activity_key])
     elif activity_key in saved_analyses:
@@ -599,7 +621,17 @@ def render_ai_analysis(row):
     else:
         st.info("Click 'Generate Analysis' for AI insights on this run")
 
-def render_activities(df):
+def render_activities(df, user_info=None, gist_id=None, filename=None, token=None):
+    # Store Gist parameters in session state for use by other functions
+    if user_info:
+        st.session_state['user_info'] = user_info
+    if gist_id:
+        st.session_state['gist_id'] = gist_id
+    if filename:
+        st.session_state['filename'] = filename
+    if token:
+        st.session_state['token'] = token
+    
     # Add comprehensive CSS right at the start to fix all spacing issues and improve UI
     st.markdown("""
     <style>
