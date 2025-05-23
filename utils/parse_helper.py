@@ -79,9 +79,9 @@ def parse_csv_plan_table(csv_raw):
     
 
 EXPECTED_COLUMNS = [
-    "Week", "Start Date", "Status",
+    "Week", "Start Date", 
     "Monday", "Tuesday", "Wednesday", "Thursday",
-    "Friday", "Saturday", "Sunday", "Comment"
+    "Friday", "Saturday", "Sunday", "Total", "Comment"
 ]
 
 def parse_training_plan(csv_text: str) -> pd.DataFrame:

@@ -6,76 +6,115 @@ import streamlit as st
 def generate_ai_prompt(selected_race, today_str, race_date, plan_df, chart_df, lap_text, previous_notes):
     st.markdown('<span style="font-size:1.5rem;vertical-align:middle;">🤖</span> <span style="font-size:1.25rem;font-weight:600;vertical-align:middle;">AI Prompt</span>', unsafe_allow_html=True)
     
-    progress_csv = chart_df.to_csv(index=False)
-    plan_csv = plan_df.to_csv(index=False)
+    # Limit running log data to recent activities only (last 10-20 runs)
+    if chart_df is not None and not chart_df.empty:
+        # Try to find date column with flexible naming
+        date_col = next((col for col in chart_df.columns if col.lower() == 'date'), None)
+        if date_col:
+            # Sort by date and take last 15 activities
+            chart_df_sorted = chart_df.sort_values(date_col, ascending=False)
+            recent_activities = chart_df_sorted.head(15)
+            # Only include essential columns for analysis
+            essential_cols = []
+            for col in chart_df.columns:
+                col_lower = col.lower()
+                if any(keyword in col_lower for keyword in ['date', 'distance', 'time', 'pace', 'tss', 'name', 'activity']):
+                    essential_cols.append(col)
+            if essential_cols:
+                recent_activities = recent_activities[essential_cols]
+            progress_csv = recent_activities.to_csv(index=False)
+        else:
+            progress_csv = "No recent activity data available"
+    else:
+        progress_csv = "No activity data available"
+    
+    # Limit training plan data to current and next 4 weeks only
+    if plan_df is not None and not plan_df.empty:
+        today = pd.to_datetime(today_str).date()
+        current_week_idx = None
+        
+        # Find current week
+        for i, row in plan_df.iterrows():
+            if "Start Date" in row:
+                start = pd.to_datetime(row["Start Date"], errors='coerce', dayfirst=True).date()
+                end = start + pd.Timedelta(days=6)
+                if start <= today <= end:
+                    current_week_idx = i
+                    break
+        
+        # Include current week and next 3-4 weeks
+        if current_week_idx is not None:
+            end_idx = min(current_week_idx + 4, len(plan_df))
+            relevant_plan = plan_df.iloc[current_week_idx:end_idx]
+        else:
+            # If no current week found, take first 4 weeks
+            relevant_plan = plan_df.head(4)
+        
+        plan_csv = relevant_plan.to_csv(index=False)
+    else:
+        plan_csv = "No training plan data available"
 
     # Find current week and day for more context
     today = pd.to_datetime(today_str).date()
     current_week_num = None
     current_week_idx = None
     for i, row in plan_df.iterrows():
-        start = pd.to_datetime(row["Start Date"]).date()
-        end = start + pd.Timedelta(days=6)
-        if start <= today <= end:
-            current_week_num = row["Week"]
-            current_week_idx = i
-            break
+        if "Start Date" in row:
+            start = pd.to_datetime(row["Start Date"], errors='coerce', dayfirst=True).date()
+            end = start + pd.Timedelta(days=6)
+            if start <= today <= end:
+                current_week_num = row.get("Week", f"Week {i+1}")
+                current_week_idx = i
+                break
 
     # Find the current week's plan and what is left (from today onward)
     plan_left_str = ""
-    if current_week_idx is not None:
+    if current_week_idx is not None and current_week_idx < len(plan_df):
         week_row = plan_df.iloc[current_week_idx]
-        week_start = pd.to_datetime(week_row["Start Date"]).date()
-        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        today_idx = (today - week_start).days
-        plan_left = []
-        for i, day in enumerate(days):
-            if i >= today_idx:
-                day_plan = week_row.get(day, "")
-                plan_left.append(f"{day}: {day_plan}")
-        plan_left_str = "\n".join(plan_left)
+        if "Start Date" in week_row:
+            week_start = pd.to_datetime(week_row["Start Date"], errors='coerce', dayfirst=True).date()
+            days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            today_idx = (today - week_start).days
+            plan_left = []
+            for i, day in enumerate(days):
+                if i >= today_idx and day in week_row:
+                    day_plan = week_row.get(day, "")
+                    plan_left.append(f"{day}: {day_plan}")
+            plan_left_str = "\n".join(plan_left)
 
     # Use get_race_and_profile_info for consistent info formatting
     race_info_block, num_weeks = get_race_and_profile_info(selected_race)
+    
+    # Limit previous notes to last 2 entries only
+    if previous_notes and len(previous_notes) > 500:  # If notes are too long
+        previous_notes = previous_notes[-500:] + "\n[... truncated for brevity]"
 
-    # Build prompt using f-strings for all interpolations
+    # Build optimized prompt with limited data
     prompt = (
-        "You are an expert running coach and your job is to analyze the athlete's training and provide actionable, concise, and data-driven feedback.\n\n"
+        "You are an expert running coach providing concise, actionable feedback.\n\n"
         f"{race_info_block}"
         f"📅 **Today:** {today_str} ({today.strftime('%A')})\n"
         f"{'📆 **Current Training Week:** ' + str(current_week_num) if current_week_num else ''}\n"
-        f"{'**Workouts remaining this week (including today):***  ' + plan_left_str if plan_left_str else ''}\n"
+        f"{'**Remaining workouts this week:**\n' + plan_left_str if plan_left_str else ''}\n"
         "---\n\n"
-        "### 📅 Full Training Plan (for reference)\n"
+        "### 📅 Current Training Plan (next 4 weeks)\n"
         "```\n"
-        f"{progress_csv}\n"
+        f"{plan_csv}\n"
         "```\n\n"
         "---\n\n"
-        "### 🏃 Last 20 Runs (Lap-by-Lap Details)\n"
-        f"{plan_csv}\n\n"
+        "### 🏃 Recent Activities (last 15 runs)\n"
+        f"{progress_csv}\n\n"
         "---\n\n"
-        "### 🧠 Previous AI Feedback\n"
-        f"{previous_notes if previous_notes else '[No prior feedback yet]'}\n\n"
+        "### 🧠 Recent AI Feedback\n"
+        f"{previous_notes if previous_notes else '[No prior feedback]'}\n\n"
         "---\n\n"
-        "## Please analyze and provide:\n\n"
-        "1. **📈 Race Readiness:** 1-2 line summary of current readiness for the race.\n"
-        "2. **✅ Strengths:** 2–3 concise points on what is working well (with metrics if possible).\n"
-        "3. **⚠️ Risks / Gaps:** What is missing, at risk, or needs urgent adjustment? (focus on current and next week)\n"
-        "4. **📉 Trends:** Notable trends in pacing, heart rate, fatigue, or compliance.\n"
-        "5. **🧠 This Week’s Recommendations:** (specify week number)\n"
-        "   - List remaining or suggested runs for this week (distance, type, and day if possible)\n"
-        "   - Add rest/recovery cues and HR/pace targets if relevant\n"
-        "   - If in the middle of a week, highlight what is left to do\n"
-        "   - **Do NOT say workouts are missing for this week unless today is after the scheduled day.**\n"
-        "6. **🛠️ Tweaks/Warnings:** Any minor tweaks, warnings, or gear/nutrition reminders for race success.\n"
-        "7. **🔄 Plan Adjustments:** Should the user change anything for this week or next week? Be specific if so.\n\n"
-        "**Instructions:**\n"
-        "- Be brief (max 10 bullet points), clear, and actionable.\n"
-        "- Use markdown formatting and emojis for clarity.\n"
-        "- If the user is in the middle of a week, reference only what is left in the plan for this week.\n"
-        "- If the user missed key workouts (i.e., days before today), suggest how to adapt.\n"
-        "- If the race is very close, focus on taper, recovery, and readiness.\n"
-        "- **Do NOT say workouts are missing for this week unless today is after the scheduled day.**\n"
+        "## Provide concise analysis (max 300 words):\n\n"
+        "1. **📈 Race Readiness:** Brief assessment\n"
+        "2. **✅ Strengths:** What's working well\n"
+        "3. **⚠️ Immediate Concerns:** Urgent issues\n"
+        "4. **🧠 This Week:** Specific recommendations\n"
+        "5. **🔄 Next Week:** Key adjustments\n\n"
+        "**Instructions:** Be brief, specific, and actionable. Focus on the next 1-2 weeks.\n"
     )
     print (prompt)
     return prompt
@@ -87,8 +126,8 @@ def get_race_and_profile_info(race_info):
         race_date_str = race_info.get('date','')
         if not start_date_str or not race_date_str:
             raise ValueError('Missing training_start_date or race_date')
-        start_date = pd.to_datetime(start_date_str, errors='coerce')
-        race_date = pd.to_datetime(race_date_str, errors='coerce')
+        start_date = pd.to_datetime(start_date_str, errors='coerce', dayfirst=True)
+        race_date = pd.to_datetime(race_date_str, errors='coerce', dayfirst=True)
         if pd.isnull(start_date) or pd.isnull(race_date):
             raise ValueError('Invalid date format for training_start_date or race_date')
         # Align both to Monday
@@ -150,7 +189,15 @@ def generate_ai_plan_prompt(race_info, ai_notes=None):
         * **Progressive Overload**: Gradually increase weekly volume (km) and/or intensity. Avoid increasing total weekly mileage by more than 10-15% per week (excluding post-down week adjustments).
         * **Rest and Recovery**: Incorporate adequate rest. If `Preferred Rest Days` are specified, try to use them. Otherwise, intelligently place rest days.
         * **Down Weeks**: Include a "down week" (reduced volume) approximately every 3-4 weeks (e.g., after 3 weeks of building, the 4th week is a down week). During a down week, reduce total weekly kilometrage by 25-35% compared to the previous peak week in that cycle.
-        * **Tapering**: Implement a taper phase in the final 2-3 weeks before race day. The taper length depends on the race `Distance` (e.g., 1 week for 5K/10K, 2-3 weeks for half/full marathon, 3+ for ultras). During the taper, reduce volume significantly but maintain some intensity with shorter, faster workouts.
+        * **Tapering**: Implement a detailed taper phase based on race distance:
+            * Marathon/Ultra: 3-week taper with volume reduced by 25% (first week), 50% (second week), and 65% (final week)
+            * Half Marathon: 2-week taper with volume reduced by 30% (first week) and 55% (final week)
+            * 10K: 10-14 day taper with volume reduced by 30% (first week) and 50% (final week)
+            * 5K: 7-10 day taper with volume reduced by 40-50% 
+            * During the taper, maintain some intensity with shorter, quality sessions while reducing overall volume
+            * Keep some race-pace work in the final week, but shorter in duration (e.g., 2-3km at race pace 3-4 days before race)
+            * Final 3 days should be very light or rest, with optional 15-20min shakeout run with a few strides the day before race
+        * **Long Runs**: Always schedule long runs on weekends (Saturday or Sunday) unless the user has explicitly specified different days for long runs. If no preference is given, default to Saturday for the long run to allow Sunday for recovery.
         * **Variety**: Ensure the plan includes a mix of workouts appropriate for the runner's level and goal:
             * Easy Runs (Zone 2, conversational pace)
             * Long Runs (essential for endurance, progressively longer)
@@ -159,7 +206,7 @@ def generate_ai_plan_prompt(race_info, ai_notes=None):
             * Hill Repeats (if `Elevation Gain` is significant or for strength)
             * Recovery Runs (very easy, short, day after hard workout)
             * Strides (short bursts of speed, e.g., 4-6 x 100m after easy runs)
-            * Rest Days ( crucial for adaptation and injury prevention)
+            * Rest Days (crucial for adaptation and injury prevention)
             * Cross-Training: `"0.0 km: Cross-Train – 45 mins cycling, Zone 2 effort (optional or if specified by user)"`
         * **Race Specificity**:
             * If `Elevation Gain` is significant (e.g., >20m/km on average, or substantial total gain for the distance), incorporate hill training (repeats, hilly routes for long runs).
@@ -178,7 +225,16 @@ def generate_ai_plan_prompt(race_info, ai_notes=None):
     4.  **Runner Profile Adaptation**:
         * Adjust the plan based on `Experience Level`, `Average Weekly KM`, and `Longest Run Recently`. Start the plan at a volume and intensity appropriate for the runner's current fitness.
         * Distribute workouts across the `Available Training Days per Week`. If the user specifies "5 days", you decide the 2 rest days unless `Preferred Rest Days` are given.
-        * Address `Known Limitations`: If injuries are mentioned, be conservative. Suggest cross-training or reduced impact alternatives if appropriate. Explicitly mention in the 'Comment' for that week if a modification is due to a limitation.
+        * For `Known Limitations` or injuries:
+            * Be conservative and directly address these limitations in workout descriptions
+            * Create specific modifications for problematic workouts (e.g., "6km easy run on soft surfaces only" for someone with knee issues)
+            * Suggest cross-training or reduced impact alternatives that specifically target the limitation
+            * Include explicit recovery protocols in the daily description for any injury-prone areas
+            * Strategically place additional rest days around challenging workouts for runners with recovery issues
+        * For `Runner Profile` information like age, weight, gender:
+            * Adjust recovery periods appropriately (e.g., more recovery for masters runners)
+            * Consider heat adaptation needs or hydration requirements based on runner physiology
+            * Tailor intensity recommendations based on experience and physiological factors
         * Incorporate `Preferred Workout Types` if they align with sound training principles for the target race.
 
     5.  **Race Week**:
@@ -191,34 +247,31 @@ def generate_ai_plan_prompt(race_info, ai_notes=None):
     - **Output a valid CSV table ONLY.** Absolutely NO code blocks, no markdown formatting (like ` ```csv ... ``` `), no introductory or concluding text, no explanations, or any other text outside the CSV data itself.
     - Each row in the CSV must represent one full week of training.
     - The first line of the output MUST be the header row.
-    - The header row must be EXACTLY: `"Week","Start Date","Status","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Comment"`
+    - The header row must be EXACTLY: `"Week","Start Date","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Total","Comment"`
     - Each subsequent row must contain **exactly 11 fields**, corresponding to the header.
     - Use a **comma (`,`)** as the sole column delimiter.
     - **Enclose EVERY field in double quotes (`"`)**, including numbers, dates, and simple words.
     - **Do not include any blank lines** in the output, not even at the end.
     - **No line breaks or newline characters (`\\\\n`)** are allowed inside a quoted field. Each CSV record must be a single line.
     - If any field's content naturally contains a comma, it must still be enclosed in double quotes as per the rule above (e.g., `"Build: Week 1, focusing on mileage"`).
-    - The "Start Date" for each week must be a Monday. Format dates as "YYYY-MM-DD".
+    - The "Start Date" for each week must be formatted as "DD/MM/YYYY" representing only the Monday date (e.g., "14/04/2025").
+    - The "Total" column must contain the sum of all workouts for the week in the format "XX.X km" (e.g., "42.5 km").
 
-    ✅ STATUS & COMMENT COLUMN RULES:
-    - **Status Column**:
-        * Use `"🏁 Race Week"` for the week of the race.
-        * Use `"✅ Completed"` if the `End Date` of the week is in the past relative to the current date 
-        * Use `"💤 Future"` if the `Start Date` of the week is in the future or is the current week.
+    ✅ COMMENT COLUMN RULES:
     - **Comment Column**:
         * Must start with the training phase name (e.g., "Base:", "Build 1:", "Build 2:", "Peak:", "Recovery:", "Taper:").
         * Follow with a brief description of the week's primary focus or purpose (e.g., "Adapting to volume", "Introducing speed work", "Peak mileage week", "Reducing volume, maintaining intensity").
 
     ✅ EXAMPLE OUTPUT SNIPPET (Illustrative - follow all rules for full output):
-    "Week","Start Date","Status","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Comment"
-    "Week 1","2025-07-07","💤 Future","6.0 km: Easy aerobic run – Zone 2, conversational","0.0 km: Rest","8.0 km: Easy run + 4x100m strides – WU: 1km easy; Main: 6km easy; Strides: 4x100m fast w/ recovery; CD: 1km easy","0.0 km: Rest","6.0 km: Easy aerobic run – Zone 2","14.0 km: Long Run – Easy, conversational pace","0.0 km: Rest","Base: Initial adaptation and building aerobic base"
-    "Week 2","2025-07-14","💤 Future","6.0 km: Easy recovery run – Zone 1-2","0.0 km: Rest","10.0 km: Intervals – WU: 2km easy; Main: 4x1km @5:00/km w/ 90s jog recovery; CD: 2km easy","0.0 km: Rest","6.0 km: Easy aerobic run – Zone 2","16.0 km: Long Run – Steady pace, building endurance","0.0 km: Rest","Base: Introducing speed work and increasing long run"
+    "Week","Start Date","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Total","Comment"
+    "Week 1","14/04/2025","6.0 km: Easy aerobic run – Zone 2, conversational","0.0 km: Rest","8.0 km: Easy run + 4x100m strides – WU: 1km easy; Main: 6km easy; Strides: 4x100m fast w/ recovery; CD: 1km easy","0.0 km: Rest","6.0 km: Easy aerobic run – Zone 2","14.0 km: Long Run – Easy, conversational pace","0.0 km: Rest","34.0 km","Base: Initial adaptation and building aerobic base"
+    "Week 2","21/04/2025","6.0 km: Easy recovery run – Zone 1-2","0.0 km: Rest","10.0 km: Intervals – WU: 2km easy; Main: 4x1km @5:00/km w/ 90s jog recovery; CD: 2km easy","0.0 km: Rest","6.0 km: Easy aerobic run – Zone 2","16.0 km: Long Run – Steady pace, building endurance","0.0 km: Rest","38.0 km","Base: Introducing speed work and increasing long run"
 
     ⛔ STRICT FINAL INSTRUCTIONS:
     - **CSV ONLY**: You MUST return only the CSV formatted text as described. No other text, explanation, or formatting.
     - **ROW COUNT**: Output exactly the {num_weeks} weeks for the plan (plus the header). No more, no fewer.
     - **HEADER MATCH**: The header must match the specified format character-for-character.
-    - **ADHERENCE TO FORMAT**: If you are absolutely unable to generate a plan that adheres to ALL the above formatting and content rules (e.g., due to contradictory or insufficient input), output a single CSV row with an error message in the "Comment" field: `"Week","Start Date","Status","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Comment"`
+    - **ADHERENCE TO FORMAT**: If you are absolutely unable to generate a plan that adheres to ALL the above formatting and content rules (e.g., due to contradictory or insufficient input), output a single CSV row with an error message in the "Comment" field: `"Week","Dates","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Total","Comment"`
     `"Error","N/A","N/A","N/A","N/A","N/A","N/A","N/A","N/A","N/A","Error: Could not generate plan due to [brief reason, e.g., invalid dates, insufficient info]."`
     This error CSV is a last resort; strive to generate the full plan. 
 
