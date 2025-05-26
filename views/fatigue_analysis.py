@@ -99,6 +99,98 @@ def save_fatigue_analysis(key, content, user_info, gist_id, filename, token):
         st.error(f"Error saving fatigue analysis: {e}")
         return False
 
+def calculate_personal_if(df, weeks_back=4):
+    """
+    Calculate the user's personal average intensity factor from recent training data.
+    
+    Args:
+        df: DataFrame with Date, Distance, TSS columns
+        weeks_back: Number of weeks to look back for calculation
+        
+    Returns:
+        float: Average intensity factor, or 0.80 if insufficient data
+    """
+    if df.empty or 'TSS' not in df.columns:
+        return 0.80  # Default fallback
+    
+    # Get recent data
+    cutoff_date = df['Date'].max() - timedelta(days=weeks_back * 7)
+    recent_df = df[df['Date'] >= cutoff_date].copy()
+    
+    # Filter out rest days and very low TSS days
+    recent_df = recent_df[(recent_df['TSS'] > 5) & (recent_df.get('Distance (km)', 0) > 1)]
+    
+    if len(recent_df) < 3:  # Need at least 3 data points
+        return 0.80
+    
+    intensity_factors = []
+    base_factor = 6  # Same as used in estimation
+    
+    for _, row in recent_df.iterrows():
+        tss = row['TSS']
+        distance = row.get('Distance (km)', 0)
+        
+        if distance > 0 and tss > 0:
+            # Reverse engineer IF from actual data: IF = sqrt(TSS / (distance * base_factor))
+            calculated_if = (tss / (distance * base_factor)) ** 0.5
+            
+            # Only include reasonable IF values (0.5 to 1.2)
+            if 0.5 <= calculated_if <= 1.2:
+                intensity_factors.append(calculated_if)
+    
+    if len(intensity_factors) >= 3:
+        avg_if = sum(intensity_factors) / len(intensity_factors)
+        return min(max(avg_if, 0.65), 1.05)  # Clamp between reasonable bounds
+    else:
+        return 0.80  # Default fallback
+
+def estimate_tss_from_workout(distance, description):
+    """
+    Estimate TSS from workout distance and description using intensity factors.
+    
+    TSS = Duration (hours) × Intensity Factor² × 100
+    
+    For running without duration, we estimate based on typical paces:
+    TSS ≈ Distance (km) × Intensity Factor² × 6 (assuming ~6 min/km base pace)
+    """
+    if distance <= 0:
+        return 0
+    
+    description_lower = description.lower()
+    
+    # Determine intensity factor based on workout description
+    if any(keyword in description_lower for keyword in ['rest', 'off', 'recovery', 'easy recovery']):
+        intensity_factor = 0.0  # Rest day
+    elif any(keyword in description_lower for keyword in ['recovery run', 'very easy', 'zone 1']):
+        intensity_factor = 0.65  # Very easy recovery
+    elif any(keyword in description_lower for keyword in ['easy', 'zone 2', 'conversational', 'aerobic']):
+        intensity_factor = 0.75  # Easy/aerobic pace
+    elif any(keyword in description_lower for keyword in ['long run', 'long', 'endurance']):
+        # Long runs are typically easy but longer duration adds stress
+        intensity_factor = 0.78  # Slightly higher than easy due to duration
+    elif any(keyword in description_lower for keyword in ['tempo', 'threshold', 'comfortably hard', 'zone 4']):
+        intensity_factor = 0.90  # Tempo/threshold pace
+    elif any(keyword in description_lower for keyword in ['interval', 'repeat', 'vo2', 'zone 5', '5k pace', '10k pace']):
+        intensity_factor = 1.05  # VO2 max intervals
+    elif any(keyword in description_lower for keyword in ['fartlek', 'progression', 'build', 'moderate']):
+        intensity_factor = 0.85  # Mixed intensity
+    elif any(keyword in description_lower for keyword in ['race', 'time trial', 'test']):
+        intensity_factor = 1.0  # Race effort
+    elif any(keyword in description_lower for keyword in ['hill', 'climb', 'uphill']):
+        intensity_factor = 0.95  # Hill work is intense
+    elif any(keyword in description_lower for keyword in ['strides', 'pickup', 'surge']):
+        intensity_factor = 0.80  # Easy run with strides
+    else:
+        # Default to moderate effort if we can't determine intensity
+        intensity_factor = 0.80
+    
+    # Estimate TSS using: Distance × IF² × Base factor
+    # Base factor assumes ~6 min/km average pace → 0.1 hours per km
+    base_factor = 6  # Represents: 0.1 hours × 100 × 0.6 (time adjustment)
+    estimated_tss = distance * (intensity_factor ** 2) * base_factor
+    
+    return max(0, estimated_tss)
+
 def calculate_tss(duration_hrs, intensity_factor):
     return duration_hrs * (intensity_factor ** 2) * 100
 
@@ -280,44 +372,164 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
     /* Modern metric cards */
     .metric-cards-container {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-        margin: 2rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.75rem;
+        margin: 1.5rem 0;
     }
     
     .metric-card-modern {
         background: rgba(255, 255, 255, 0.02);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
-        padding: 1.5rem;
+        border-radius: 8px;
+        padding: 1rem;
         text-align: center;
         transition: all 0.3s ease;
         backdrop-filter: blur(10px);
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
     
     .metric-card-modern:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        border-color: rgba(255, 255, 255, 0.15);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: rgba(255, 255, 255, 0.12);
     }
     
     .metric-icon {
-        font-size: 2rem;
-        margin-bottom: 0.5rem;
+        font-size: 1.2rem;
+        margin-bottom: 0.25rem;
         display: block;
     }
     
     .metric-label {
-        font-size: 0.85rem;
-        opacity: 0.8;
-        margin-bottom: 0.5rem;
+        font-size: 0.7rem;
+        opacity: 0.7;
+        margin-bottom: 0.25rem;
         font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
     .metric-value {
-        font-size: 2rem;
+        font-size: 1.4rem;
         font-weight: 700;
         margin: 0;
+        line-height: 1.2;
+    }
+    
+    .metric-trend {
+        font-size: 0.6rem;
+        opacity: 0.8;
+        margin-top: 0.25rem;
+        font-weight: 500;
+    }
+    
+    /* TSB Meter Styles */
+    .tsb-meter-container {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+        text-align: center;
+    }
+    
+    .tsb-meter-title {
+        font-size: 0.9rem;
+        opacity: 0.8;
+        margin-bottom: 1rem;
+        font-weight: 500;
+    }
+    
+    .tsb-gauge {
+        position: relative;
+        width: 200px;
+        height: 100px;
+        margin: 0 auto 1rem;
+    }
+    
+    .tsb-gauge-bg {
+        width: 200px;
+        height: 100px;
+        border-radius: 100px 100px 0 0;
+        background: linear-gradient(90deg, 
+            #dc3545 0%, 
+            #fd7e14 25%, 
+            #28a745 50%, 
+            #007bff 75%, 
+            #ffc107 100%);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .tsb-gauge-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 160px;
+        height: 80px;
+        background: #0e1117;
+        border-radius: 80px 80px 0 0;
+    }
+    
+    .tsb-needle {
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        width: 2px;
+        height: 70px;
+        background: white;
+        transform-origin: bottom center;
+        transform: translateX(-50%);
+        border-radius: 2px;
+        box-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+    
+    .tsb-value-display {
+        position: absolute;
+        bottom: 15px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: white;
+    }
+    
+    .tsb-labels {
+        display: flex;
+        justify-content: space-between;
+        width: 200px;
+        margin: 0 auto;
+        font-size: 0.7rem;
+        opacity: 0.6;
+    }
+    
+    .tsb-status {
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-top: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        display: inline-block;
+    }
+    
+    .tsb-overreach { background: rgba(220, 53, 69, 0.2); color: #dc3545; }
+    .tsb-fatigue { background: rgba(253, 126, 20, 0.2); color: #fd7e14; }
+    .tsb-optimal { background: rgba(40, 167, 69, 0.2); color: #28a745; }
+    .tsb-fresh { background: rgba(0, 123, 255, 0.2); color: #007bff; }
+    .tsb-detraining { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+    
+    .tsb-recommendation {
+        font-size: 0.8rem;
+        margin-top: 0.75rem;
+        padding: 0.75rem;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        border-left: 3px solid #667eea;
+        opacity: 0.9;
     }
     
     /* Status indicator */
@@ -359,18 +571,64 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
         
         .metric-cards-container {
             grid-template-columns: 1fr;
-        }
-        
-        .control-grid {
-            grid-template-columns: 1fr;
+            gap: 0.5rem;
         }
         
         .metric-card-modern {
-            padding: 1rem;
+            padding: 0.75rem;
+            min-height: 100px;
         }
         
         .metric-value {
-            font-size: 1.5rem;
+            font-size: 1.2rem;
+        }
+        
+        .tsb-gauge {
+            width: 150px;
+            height: 75px;
+        }
+        
+        .tsb-gauge-bg {
+            width: 150px;
+            height: 75px;
+        }
+        
+        .tsb-gauge-overlay {
+            width: 120px;
+            height: 60px;
+        }
+        
+        .tsb-needle {
+            height: 50px;
+        }
+        
+        .tsb-labels {
+            width: 150px;
+            font-size: 0.6rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .metric-cards-container {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.25rem;
+        }
+        
+        .metric-card-modern {
+            padding: 0.5rem;
+            min-height: 90px;
+        }
+        
+        .metric-value {
+            font-size: 1rem;
+        }
+        
+        .metric-icon {
+            font-size: 1rem;
+        }
+        
+        .metric-label {
+            font-size: 0.6rem;
         }
     }
     
@@ -395,6 +653,25 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
         <h1 class="fatigue-header-text">Fatigue Analysis</h1>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Quick Action Bar
+    if not df.empty and 'TSB' in df.columns:
+        latest = df.iloc[-1]
+        tsb = latest['TSB']
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            if st.button("📈 View Trends", use_container_width=True):
+                st.session_state['show_trends'] = True
+        with col2:
+            if st.button("🎯 Race Readiness", use_container_width=True):
+                st.session_state['show_race_readiness'] = True
+        with col3:
+            if st.button("📊 Export Data", use_container_width=True):
+                st.session_state['show_export'] = True
+        with col4:
+            if st.button("💡 Quick Tips", use_container_width=True):
+                st.session_state['show_tips'] = True
 
     # Get LTHR from runner profile or input
     runner_profile = st.session_state.get("user_info", {}).get("runner_profile", {})
@@ -423,6 +700,7 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
 
     # Data preparation (unchanged logic)
     df = df.copy()
+    
     if "TSS" not in df.columns:
         if "Avg HR" in df.columns and "Elapsed Time (min)" in df.columns:
             df["TSS"] = df.apply(lambda row: calculate_tss_from_hr(row, lthr), axis=1)
@@ -432,13 +710,32 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
             st.error("Your data must have a 'TSS' column, or columns for 'Avg HR' and 'Elapsed Time (min)', or both 'Duration (hrs)' and 'IF'.")
             st.stop()
     
+    # st.info(f"🔍 Debug: Initial data shape: {df.shape}, columns: {list(df.columns)}")
+    
+    # st.info(f"📈 TSS Summary: Min={df['TSS'].min():.1f}, Max={df['TSS'].max():.1f}, Mean={df['TSS'].mean():.1f}")
+    
+    # Ensure we have valid TSS data
+    if df.empty or df["TSS"].isna().all():
+        st.warning("No valid TSS data found. Please check your activity data.")
+        st.stop()
+    
     df = calculate_atl_ctl_tsb(df)
     df = df.dropna(subset=["Date"]).sort_values("Date")
+    
+    # Verify fatigue metrics were calculated
+    if 'CTL' not in df.columns or 'ATL' not in df.columns or 'TSB' not in df.columns:
+        st.error("Failed to calculate fatigue metrics (CTL, ATL, TSB). Please check your TSS data.")
+        st.stop()
     
     if range_days[selected_range]:
         min_date = today - timedelta(days=range_days[selected_range])
         df = df[df["Date"] >= min_date]
-
+    
+    # Final check that we still have data after filtering
+    if df.empty:
+        st.warning(f"No data available for the selected time range: {selected_range}")
+        st.stop()
+    
     # Simplified metric overlay (optional, collapsed by default)
     with st.expander("📈 Chart Options", expanded=False):
         metric_options = [
@@ -475,63 +772,291 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
                     if 'weeks' in plan and plan['weeks']:
                         # Find the race with the latest start date
                         first_week = plan['weeks'][0]
-                        start_date = pd.to_datetime(first_week.get('start_date', ''), dayfirst=True).date()
+                        raw_start_date = first_week.get('start_date', '')
+                        
+                        # Determine the date format for this plan
+                        detected_format = None
+                        start_date_ts = None
+                        for date_format in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d']:
+                            try:
+                                start_date_ts = pd.to_datetime(raw_start_date, format=date_format, errors='raise')
+                                detected_format = date_format
+                                break
+                            except Exception:
+                                continue
+                        
+                        # If no format worked, try general parsing
+                        if start_date_ts is None or pd.isna(start_date_ts):
+                            try:
+                                start_date_ts = pd.to_datetime(raw_start_date, errors='coerce')
+                                if not pd.isna(start_date_ts):
+                                    pass
+                            except Exception:
+                                pass
+                        
+                        # Skip if date is still invalid
+                        if start_date_ts is None or pd.isna(start_date_ts):
+                            continue
+                        
+                        start_date = start_date_ts.date()
                         if latest_race_date is None or start_date > latest_race_date:
                             latest_race_date = start_date
                             active_plan = plan
+                            active_plan['_detected_format'] = detected_format  # Store the detected format
                 
                 if active_plan and 'weeks' in active_plan:
-                    # Generate future fatigue data
-                    future_data = []
+                    # Initialize variables early to avoid scope issues
                     last_date = df['Date'].max().date() if not df.empty else today
                     last_ctl = df['CTL'].iloc[-1] if not df.empty else 0
                     last_atl = df['ATL'].iloc[-1] if not df.empty else 0
                     
+                    # Calculate user's personal average intensity factor from recent data
+                    personal_if = calculate_personal_if(df, weeks_back=4)
+                    
+                    # Generate future fatigue data
+                    future_data = []
+                    weekly_breakdown = []  # For debugging
+                    
+                    # Validate training plan dates for sequential order
+                    plan_dates = []
+                    detected_format = active_plan.get('_detected_format')
+                    
+                    for week in active_plan['weeks']:
+                        raw_week_date = week.get('start_date', '')
+                        if raw_week_date:
+                            # Use the detected format first, then try others as fallback
+                            week_start_ts = None
+                            
+                            if detected_format:
+                                try:
+                                    week_start_ts = pd.to_datetime(raw_week_date, format=detected_format, errors='raise')
+                                except Exception:
+                                    pass
+                            
+                            # If detected format failed, try others
+                            if week_start_ts is None or pd.isna(week_start_ts):
+                                for date_format in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d']:
+                                    if date_format == detected_format:
+                                        continue  # Already tried
+                                    try:
+                                        week_start_ts = pd.to_datetime(raw_week_date, format=date_format, errors='raise')
+                                        break
+                                    except Exception:
+                                        continue
+                            
+                            if week_start_ts and not pd.isna(week_start_ts):
+                                plan_dates.append((week.get('week_number', '?'), week_start_ts.date(), raw_week_date))
+                    
+                    # Check for date inconsistencies
+                    if len(plan_dates) > 1:
+                        non_sequential = []
+                        for i in range(1, len(plan_dates)):
+                            prev_week, prev_date, prev_raw = plan_dates[i-1]
+                            curr_week, curr_date, curr_raw = plan_dates[i]
+                            expected_gap = 7  # Should be 7 days apart
+                            actual_gap = (curr_date - prev_date).days
+                            
+                            if abs(actual_gap - expected_gap) > 3:  # Allow some tolerance
+                                non_sequential.append(f"Week {prev_week} ({prev_raw}) → Week {curr_week} ({curr_raw}): {actual_gap} days gap")
+                        
+                        if non_sequential:
+                            st.warning("⚠️ **Training Plan Date Issues Detected:**")
+                            for issue in non_sequential[:5]:  # Show first 5 issues
+                                st.warning(f"• {issue}")
+                            if len(non_sequential) > 5:
+                                st.warning(f"• ... and {len(non_sequential) - 5} more issues")
+                            st.warning("📝 **Recommendation:** Check your race planning data for incorrect dates. The prediction may be inaccurate.")
+                    
+                    # First, fill any gap between last data and first training plan week
+                    first_plan_date = None
+                    for week in active_plan['weeks']:
+                        raw_week_date = week.get('start_date', '')
+                        
+                        # Use the detected format first, then try others as fallback
+                        week_start_ts = None
+                        
+                        if detected_format:
+                            try:
+                                week_start_ts = pd.to_datetime(raw_week_date, format=detected_format, errors='raise')
+                            except Exception:
+                                pass
+                        
+                        # If detected format failed, try others
+                        if week_start_ts is None or pd.isna(week_start_ts):
+                            for date_format in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d']:
+                                if date_format == detected_format:
+                                    continue  # Already tried
+                                try:
+                                    week_start_ts = pd.to_datetime(raw_week_date, format=date_format, errors='raise')
+                                    break
+                                except Exception:
+                                    continue
+                        
+                        # If no format worked, try general parsing
+                        if week_start_ts is None or pd.isna(week_start_ts):
+                            try:
+                                week_start_ts = pd.to_datetime(raw_week_date, errors='coerce')
+                            except Exception:
+                                pass
+                        
+                        # Skip if date is invalid
+                        if week_start_ts is None or pd.isna(week_start_ts):
+                            continue
+                        
+                        week_start = week_start_ts.date()
+                        if week_start > last_date:
+                            first_plan_date = week_start
+                            break
+                    
+                    # Fill gap with low TSS rest days if there's a gap > 1 day
+                    if first_plan_date and (first_plan_date - last_date).days > 1:
+                        gap_days = (first_plan_date - last_date).days - 1
+                        for i in range(1, gap_days):  # Start from day after last_date
+                            gap_date = last_date + timedelta(days=i)
+                            # Assume rest days in the gap
+                            gap_tss = 0
+                            
+                            # Calculate projected CTL and ATL with rest days
+                            alpha_ctl = 2 / (42 + 1)
+                            alpha_atl = 2 / (7 + 1)
+                            
+                            new_ctl = last_ctl * (1 - alpha_ctl) + gap_tss * alpha_ctl
+                            new_atl = last_atl * (1 - alpha_atl) + gap_tss * alpha_atl
+                            new_tsb = new_ctl - new_atl
+                            
+                            future_data.append({
+                                'Date': pd.Timestamp(gap_date),
+                                'TSS': gap_tss,
+                                'CTL': new_ctl,
+                                'ATL': new_atl,
+                                'TSB': new_tsb,
+                                'is_prediction': True
+                            })
+                            
+                            last_ctl = new_ctl
+                            last_atl = new_atl
+                    
                     # Project each week from the training plan
                     for week in active_plan['weeks']:
-                        start_date = pd.to_datetime(week.get('start_date', ''), dayfirst=True).date()
+                        raw_week_date = week.get('start_date', '')
+                        week_number = week.get('week_number', '?')
                         
-                        # Only predict future weeks
-                        if start_date > last_date:
-                            # Calculate weekly TSS from planned training
+                        # Use the detected format first, then try others as fallback
+                        week_start_ts = None
+                        
+                        if detected_format:
+                            try:
+                                week_start_ts = pd.to_datetime(raw_week_date, format=detected_format, errors='raise')
+                            except Exception:
+                                pass
+                        
+                        # If detected format failed, try others
+                        if week_start_ts is None or pd.isna(week_start_ts):
+                            for date_format in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d']:
+                                if date_format == detected_format:
+                                    continue  # Already tried
+                                try:
+                                    week_start_ts = pd.to_datetime(raw_week_date, format=date_format, errors='raise')
+                                    break
+                                except Exception:
+                                    continue
+                        
+                        # If no format worked, try general parsing
+                        if week_start_ts is None or pd.isna(week_start_ts):
+                            try:
+                                week_start_ts = pd.to_datetime(raw_week_date, errors='coerce')
+                            except Exception:
+                                pass
+                        
+                        # Skip if date is invalid
+                        if week_start_ts is None or pd.isna(week_start_ts):
+                            continue
+                        
+                        week_start = week_start_ts.date()
+                        week_end_date = week_start + timedelta(days=6)
+                        
+                        # Include this week if it contains any future days
+                        if week_end_date > last_date:
+                            # Calculate weekly TSS from planned training using personal IF
                             weekly_tss = 0
+                            week_details = []
                             days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
                             
-                            for day in days:
-                                day_plan = week.get(day, {})
-                                distance = float(day_plan.get('distance', 0))
+                            for day_idx, day in enumerate(days):
+                                current_day_date = week_start + timedelta(days=day_idx)
                                 
-                                # Estimate TSS from distance (rough approximation)
-                                # This is a simple model - could be improved with intensity factors
-                                if distance > 0:
-                                    estimated_tss = distance * 7  # ~7 TSS per km for moderate effort
-                                    weekly_tss += estimated_tss
+                                # Only include days that are in the future
+                                if current_day_date > last_date:
+                                    day_plan = week.get(day, {})
+                                    distance = float(day_plan.get('distance', 0))
+                                    description = day_plan.get('description', '')
+                                    
+                                    # Use personal IF for all non-rest workouts
+                                    if distance > 0:
+                                        # Still check for rest days
+                                        if any(keyword in description.lower() for keyword in ['rest', 'off']):
+                                            estimated_tss = 0
+                                        else:
+                                            # Use personal IF for all actual workouts
+                                            base_factor = 6
+                                            estimated_tss = distance * (personal_if ** 2) * base_factor
+                                        
+                                        weekly_tss += estimated_tss
+                                        week_details.append(f"{day.title()}: {distance}km ({description[:20]}...) = {estimated_tss:.0f} TSS")
                             
-                            # Create daily projections for the week
-                            for day_offset in range(7):
-                                current_date = start_date + timedelta(days=day_offset)
-                                daily_tss = weekly_tss / 7  # Distribute weekly TSS evenly
-                                
-                                # Calculate projected CTL and ATL using exponential moving averages
-                                # CTL (42-day EMA) and ATL (7-day EMA)
-                                alpha_ctl = 2 / (42 + 1)  # CTL smoothing factor
-                                alpha_atl = 2 / (7 + 1)   # ATL smoothing factor
-                                
-                                new_ctl = last_ctl * (1 - alpha_ctl) + daily_tss * alpha_ctl
-                                new_atl = last_atl * (1 - alpha_atl) + daily_tss * alpha_atl
-                                new_tsb = new_ctl - new_atl
-                                
-                                future_data.append({
-                                    'Date': pd.Timestamp(current_date),
-                                    'TSS': daily_tss,
-                                    'CTL': new_ctl,
-                                    'ATL': new_atl,
-                                    'TSB': new_tsb,
-                                    'is_prediction': True
+                            # Only add week to breakdown if it has future training
+                            if weekly_tss > 0 or week_details:
+                                weekly_breakdown.append({
+                                    'week': f"Week {week_number}",
+                                    'start_date': week_start.strftime('%b %d'),
+                                    'total_tss': weekly_tss,
+                                    'details': week_details
                                 })
+                            
+                            # Create daily projections for future days in this week
+                            for day_idx, day in enumerate(days):
+                                current_day_date = week_start + timedelta(days=day_idx)
                                 
-                                last_ctl = new_ctl
-                                last_atl = new_atl
+                                # Only create predictions for future days
+                                if current_day_date > last_date:
+                                    day_plan = week.get(day, {})
+                                    distance = float(day_plan.get('distance', 0))
+                                    description = day_plan.get('description', '')
+                                    
+                                    # Calculate daily TSS
+                                    if distance > 0:
+                                        if any(keyword in description.lower() for keyword in ['rest', 'off']):
+                                            daily_tss = 0
+                                        else:
+                                            base_factor = 6
+                                            daily_tss = distance * (personal_if ** 2) * base_factor
+                                    else:
+                                        daily_tss = 0
+                                    
+                                    # Calculate projected CTL and ATL
+                                    alpha_ctl = 2 / (42 + 1)
+                                    alpha_atl = 2 / (7 + 1)
+                                    
+                                    new_ctl = last_ctl * (1 - alpha_ctl) + daily_tss * alpha_ctl
+                                    new_atl = last_atl * (1 - alpha_atl) + daily_tss * alpha_atl
+                                    new_tsb = new_ctl - new_atl
+                                    
+                                    future_data.append({
+                                        'Date': pd.Timestamp(current_day_date),
+                                        'TSS': daily_tss,
+                                        'CTL': new_ctl,
+                                        'ATL': new_atl,
+                                        'TSB': new_tsb,
+                                        'is_prediction': True,
+                                        'Distance (km)': distance,  # Add planned distance for overlay
+                                        'Planned_Distance': distance  # Alternative column name
+                                    })
+                                    
+                                    last_ctl = new_ctl
+                                    last_atl = new_atl
+                        
+                        else:
+                            pass
                     
                     if future_data:
                         # Combine historical and future data
@@ -542,7 +1067,59 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
                         df_extended = pd.concat([df_historical, df_future], ignore_index=True)
                         df_extended = df_extended.sort_values('Date').reset_index(drop=True)
                         
-                        st.info(f"🔮 Showing prediction for {len(future_data)} future days based on your training plan")
+                        st.success(f"🔮 Showing prediction for {len(future_data)} future days based on your training plan")
+                        
+                        # Show gap information if applicable
+                        if first_plan_date and (first_plan_date - last_date).days > 1:
+                            gap_days = (first_plan_date - last_date).days - 1
+                            st.info(f"📅 Filled {gap_days} gap days between last data ({last_date.strftime('%b %d')}) and training plan start ({first_plan_date.strftime('%b %d')}) with rest days")
+                        
+                        # Show TSS prediction breakdown
+                        with st.expander("🔍 TSS Prediction Breakdown", expanded=False):
+                            # Show personal IF calculation
+                            recent_activities = df[df['Date'] >= (df['Date'].max() - timedelta(days=28))]
+                            recent_activities = recent_activities[(recent_activities['TSS'] > 5) & (recent_activities.get('Distance (km)', 0) > 1)]
+                            
+                            st.markdown(f"**📊 Your Personal Training Profile:**")
+                            st.markdown(f"- **Personal Intensity Factor:** {personal_if:.3f}")
+                            st.markdown(f"- **Based on:** {len(recent_activities)} activities from last 4 weeks")
+                            if not recent_activities.empty:
+                                avg_tss_per_km = (recent_activities['TSS'] / recent_activities.get('Distance (km)', 1)).mean()
+                                st.markdown(f"- **Your average:** {avg_tss_per_km:.1f} TSS per km")
+                            st.markdown("")
+                            
+                            st.markdown("**Weekly TSS Estimates:**")
+                            for week_info in weekly_breakdown[:4]:  # Show first 4 weeks
+                                st.markdown(f"**{week_info['week']} ({week_info['start_date']})** - Total: {week_info['total_tss']:.0f} TSS")
+                                for detail in week_info['details']:
+                                    st.markdown(f"  • {detail}")
+                                st.markdown("")
+                            
+                            if len(weekly_breakdown) > 4:
+                                st.markdown(f"... and {len(weekly_breakdown) - 4} more weeks")
+                            
+                            st.markdown("**📈 Prediction Method:**")
+                            st.markdown(f"""
+                            - Uses your personal IF ({personal_if:.3f}) calculated from recent training
+                            - Formula: TSS = Distance × (Personal IF)² × 6
+                            - Rest days automatically detected and set to 0 TSS
+                            - More accurate than generic intensity factors
+                            """)
+                    else:
+                        st.warning("⚠️ Debug: No future data generated - this could mean:")
+                        st.warning("• All training plan weeks are in the past")
+                        st.warning("• No training plan weeks have valid dates")
+                        st.warning("• Training plan structure is not as expected")
+                        
+                        # Show some sample weeks for debugging
+                        if active_plan and 'weeks' in active_plan:
+                            st.write("📝 Sample week structure:")
+                            for i, week in enumerate(active_plan['weeks'][:2]):  # Show first 2 weeks
+                                st.write(f"Week {i+1}: {week}")
+                else:
+                    st.warning("⚠️ Debug: No active training plan found or no weeks in plan")
+            else:
+                st.warning("⚠️ Debug: No training plans found in race planning data")
         
         except Exception as e:
             st.warning(f"Could not load race plan for prediction: {str(e)}")
@@ -575,7 +1152,7 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
             y=alt.Y("ATL:Q"),
             tooltip=["Date:T", "CTL:Q", "ATL:Q", "TSB:Q", "TSS:Q"]
         )
-        tsb_line_hist = base_historical.mark_line(color="#feca57", strokeDash=[8,4], strokeWidth=2, strokeCap="round").encode(
+        tsb_line_hist = base_historical.mark_line(color="#feca57", strokeWidth=3, strokeCap="round").encode(
             y=alt.Y("TSB:Q"),
             tooltip=["Date:T", "CTL:Q", "ATL:Q", "TSB:Q", "TSS:Q"]
         )
@@ -584,15 +1161,15 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
         base_future = alt.Chart(chart_df[chart_df['is_prediction'] == True]).encode(x=alt.X("Date:T", axis=x_axis))
         ctl_line_pred = base_future.mark_line(color="#667eea", strokeWidth=2, strokeDash=[8,4], opacity=0.7).encode(
             y=alt.Y("CTL:Q"), 
-            tooltip=["Date:T", "CTL:Q", "ATL:Q", "TSB:Q", alt.value("Predicted")]
+            tooltip=["Date:T", "CTL:Q", "ATL:Q", "TSB:Q"]
         )
         atl_line_pred = base_future.mark_line(color="#ff6b6b", strokeWidth=2, strokeDash=[8,4], opacity=0.7).encode(
             y=alt.Y("ATL:Q"),
-            tooltip=["Date:T", "CTL:Q", "ATL:Q", "TSB:Q", alt.value("Predicted")]
+            tooltip=["Date:T", "CTL:Q", "ATL:Q", "TSB:Q"]
         )
         tsb_line_pred = base_future.mark_line(color="#feca57", strokeDash=[12,8], strokeWidth=1.5, opacity=0.7).encode(
             y=alt.Y("TSB:Q"),
-            tooltip=["Date:T", "CTL:Q", "ATL:Q", "TSB:Q", alt.value("Predicted")]
+            tooltip=["Date:T", "CTL:Q", "ATL:Q", "TSB:Q"]
         )
         
         # Combine historical and predicted lines
@@ -607,7 +1184,7 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
             y=alt.Y("ATL:Q"),
             tooltip=["Date:T", "CTL:Q", "ATL:Q", "TSB:Q", "TSS:Q"]
         )
-        tsb_line = base.mark_line(color="#feca57", strokeDash=[8,4], strokeWidth=2, strokeCap="round").encode(
+        tsb_line = base.mark_line(color="#feca57", strokeWidth=3, strokeCap="round").encode(
             y=alt.Y("TSB:Q"),
             tooltip=["Date:T", "CTL:Q", "ATL:Q", "TSB:Q", "TSS:Q"]
         )
@@ -619,21 +1196,64 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
     if selected_metric and selected_metric in df.columns:
         color = metric_colors.get(selected_metric, "#888")
         
-        # Only show overlay for historical data (predictions don't have overlay metrics)
-        overlay_df = chart_df[chart_df['is_prediction'] == False] if predict_future and future_data else chart_df
-        base_overlay = alt.Chart(overlay_df).encode(x=alt.X("Date:T", axis=x_axis))
-        
-        # Create bars for the overlay metric with secondary y-axis
-        overlay_bars = base_overlay.mark_bar(
-            color=color, 
-            opacity=0.6,
-            size=20
-        ).encode(
-            y=alt.Y(f"{selected_metric}:Q", 
-                   axis=alt.Axis(title=selected_metric, titleColor=color, labelColor=color),
-                   scale=alt.Scale(domain=[0, overlay_df[selected_metric].max() * 1.1]) if not overlay_df.empty else alt.Scale(domain=[0, 100])),
-            tooltip=["Date:T", f"{selected_metric}:Q"]
-        )
+        if predict_future and future_data and selected_metric in ['Distance (km)', 'Planned_Distance']:
+            # Show both historical and predicted data for distance
+            historical_df = chart_df[chart_df['is_prediction'] == False]
+            predicted_df = chart_df[chart_df['is_prediction'] == True]
+            
+            base_overlay = alt.Chart(chart_df).encode(x=alt.X("Date:T", axis=x_axis))
+            
+            # Historical bars (solid)
+            if not historical_df.empty:
+                historical_bars = alt.Chart(historical_df).encode(x=alt.X("Date:T", axis=x_axis)).mark_bar(
+                    color=color, 
+                    opacity=0.7,
+                    size=20
+                ).encode(
+                    y=alt.Y(f"{selected_metric}:Q", 
+                           axis=alt.Axis(title=f"{selected_metric} (Actual/Planned)", titleColor=color, labelColor=color),
+                           scale=alt.Scale(domain=[0, chart_df[selected_metric].max() * 1.1]) if not chart_df.empty else alt.Scale(domain=[0, 100])),
+                    tooltip=["Date:T", f"{selected_metric}:Q"]
+                )
+            else:
+                historical_bars = alt.Chart()
+            
+            # Predicted bars (hatched pattern simulation with lower opacity)
+            if not predicted_df.empty and selected_metric in predicted_df.columns:
+                predicted_bars = alt.Chart(predicted_df).encode(x=alt.X("Date:T", axis=x_axis)).mark_bar(
+                    color=color,
+                    opacity=0.4,  # Lower opacity for predicted
+                    size=20,
+                    stroke=color,
+                    strokeWidth=1
+                ).encode(
+                    y=alt.Y(f"{selected_metric}:Q", 
+                           axis=alt.Axis(title=f"{selected_metric} (Actual/Planned)", titleColor=color, labelColor=color),
+                           scale=alt.Scale(domain=[0, chart_df[selected_metric].max() * 1.1]) if not chart_df.empty else alt.Scale(domain=[0, 100])),
+                    tooltip=["Date:T", f"{selected_metric}:Q"]
+                )
+            else:
+                predicted_bars = alt.Chart()
+            
+            # Combine historical and predicted bars
+            overlay_bars = historical_bars + predicted_bars
+            
+        else:
+            # Standard overlay for non-distance metrics or when prediction is off
+            overlay_df = chart_df[chart_df['is_prediction'] == False] if predict_future and future_data else chart_df
+            base_overlay = alt.Chart(overlay_df).encode(x=alt.X("Date:T", axis=x_axis))
+            
+            # Create bars for the overlay metric with secondary y-axis
+            overlay_bars = base_overlay.mark_bar(
+                color=color, 
+                opacity=0.6,
+                size=20
+            ).encode(
+                y=alt.Y(f"{selected_metric}:Q", 
+                       axis=alt.Axis(title=selected_metric, titleColor=color, labelColor=color),
+                       scale=alt.Scale(domain=[0, overlay_df[selected_metric].max() * 1.1]) if not overlay_df.empty else alt.Scale(domain=[0, 100])),
+                tooltip=["Date:T", f"{selected_metric}:Q"]
+            )
         
         # Layer the charts with proper axis resolution
         chart = alt.layer(
@@ -647,60 +1267,196 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
     
     # Configure final chart properties
     prediction_text = " (Dashed = Predicted)" if predict_future and future_data else ""
-    overlay_text = f" • {selected_metric} (Bars)" if selected_metric else ""
+    
+    if selected_metric and predict_future and future_data and selected_metric in ['Distance (km)', 'Planned_Distance']:
+        overlay_text = f" • {selected_metric} (Solid = Actual, Faded = Planned)"
+    elif selected_metric:
+        overlay_text = f" • {selected_metric} (Bars)"
+    else:
+        overlay_text = ""
+    
+    # Get current metrics for chart title
+    current_metrics_text = ""
+    if not df.empty and all(col in df.columns for col in ['CTL', 'ATL', 'TSB']):
+        latest_for_chart = df.iloc[-1]
+        current_metrics_text = f"Current: CTL {latest_for_chart['CTL']:.1f} | ATL {latest_for_chart['ATL']:.1f} | TSB {latest_for_chart['TSB']:.1f}"
     
     chart = chart.properties(
-        height=350,
+        height=400,
         title=alt.TitleParams(
-            text=["Training Load Analysis" + prediction_text, "CTL (Blue) • ATL (Red) • TSB (Yellow)" + overlay_text],
-            fontSize=14,
+            text=["🏃‍♂️ Training Load Analysis" + prediction_text, 
+                  f"CTL: Fitness (Blue) • ATL: Fatigue (Red) • TSB: Form (Yellow){overlay_text}",
+                  current_metrics_text],
+            fontSize=16,
             anchor='start',
             color='white',
-            subtitleFontSize=11,
+            subtitleFontSize=12,
             subtitleColor='#888'
         )
     ).interactive()
 
     st.altair_chart(chart, use_container_width=True)
-
-    # Modern metric cards
-    if not df.empty:
+    
+    # Summary Dashboard Widget
+    if not df.empty and all(col in df.columns for col in ['CTL', 'ATL', 'TSB']):
         latest = df.iloc[-1]
-        tsb = latest['TSB']
         
-        st.markdown("**📊 Current Metrics**")
+        # Calculate key insights
+        fitness_trend = "📈 Building" if len(df) > 7 and latest['CTL'] > df.iloc[-7]['CTL'] else "📉 Declining" if len(df) > 7 and latest['CTL'] < df.iloc[-7]['CTL'] else "→ Stable"
+        days_until_peak = max(0, int((5 - latest['TSB']) / 0.5)) if latest['TSB'] < 5 else 0
+        recommended_action = "🏃‍♂️ Add training load" if latest['TSB'] > 15 else "💪 Quality training time" if -5 <= latest['TSB'] <= 15 else "😴 Recovery needed"
+        
         st.markdown(f"""
-        <div class="metric-cards-container">
-            <div class="metric-card-modern">
-                <span class="metric-icon">🏋️</span>
-                <div class="metric-label">CTL (Fitness)</div>
-                <div class="metric-value" style="color: #667eea;">{latest['CTL']:.1f}</div>
+        <div style="
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        ">
+            <div style="text-align: center;">
+                <div style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.5rem;">FITNESS TREND</div>
+                <div style="font-size: 1.1rem; font-weight: 600;">{fitness_trend}</div>
             </div>
-            <div class="metric-card-modern">
-                <span class="metric-icon">⚡</span>
-                <div class="metric-label">ATL (Fatigue)</div>
-                <div class="metric-value" style="color: #ff6b6b;">{latest['ATL']:.1f}</div>
+            <div style="text-align: center;">
+                <div style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.5rem;">RECOMMENDED ACTION</div>
+                <div style="font-size: 1.1rem; font-weight: 600;">{recommended_action}</div>
             </div>
-            <div class="metric-card-modern">
-                <span class="metric-icon">🎯</span>
-                <div class="metric-label">TSB (Form)</div>
-                <div class="metric-value" style="color: #feca57;">{latest['TSB']:.1f}</div>
+            <div style="text-align: center;">
+                <div style="font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.5rem;">TRAINING STATUS</div>
+                <div style="font-size: 1.1rem; font-weight: 600;">{"🎯 Race Ready" if -5 <= latest['TSB'] <= 5 else "🚀 Very Fresh" if latest['TSB'] > 10 else "⚡ High Load"}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Modern status indicator
-        if tsb < -15:
-            status_class = "status-danger"
-            status_text = "⚠️ Overreaching - Consider Recovery"
-        elif tsb > 10:
-            status_class = "status-warning"
-            status_text = "💤 Detraining - Consider Increasing Load"
+    # Modern metric cards
+    if not df.empty and all(col in df.columns for col in ['CTL', 'ATL', 'TSB']):
+        latest = df.iloc[-1]
+        tsb = latest['TSB']
+        
+        # Calculate trends (compare to 7 days ago)
+        week_ago_data = df[df['Date'] <= (latest['Date'] - timedelta(days=7))]
+        if not week_ago_data.empty:
+            week_ago = week_ago_data.iloc[-1]
+            ctl_change = ((latest['CTL'] - week_ago['CTL']) / week_ago['CTL']) * 100 if week_ago['CTL'] != 0 else 0
+            atl_change = ((latest['ATL'] - week_ago['ATL']) / week_ago['ATL']) * 100 if week_ago['ATL'] != 0 else 0
+            tsb_change = latest['TSB'] - week_ago['TSB']  # Absolute change for TSB
+            
+            ctl_trend = "↗️" if ctl_change > 2 else "↘️" if ctl_change < -2 else "→"
+            atl_trend = "↗️" if atl_change > 2 else "↘️" if atl_change < -2 else "→"
+            tsb_trend = "↗️" if tsb_change > 2 else "↘️" if tsb_change < -2 else "→"
+            
+            ctl_trend_text = f"{ctl_trend} {ctl_change:+.1f}%"
+            atl_trend_text = f"{atl_trend} {atl_change:+.1f}%"
+            tsb_trend_text = f"{tsb_trend} {tsb_change:+.1f}"
         else:
-            status_class = "status-optimal"
-            status_text = "✅ Optimal Training Zone"
-
-        st.markdown(f'<div class="status-indicator {status_class}">{status_text}</div>', unsafe_allow_html=True)
+            ctl_trend_text = atl_trend_text = tsb_trend_text = ""
+        
+        # Calculate TSB needle position (0-180 degrees)
+        # TSB range from -30 to +30, mapped to 0-180 degrees
+        tsb_clamped = max(-30, min(30, tsb))
+        needle_angle = ((tsb_clamped + 30) / 60) * 180
+        
+        # Determine TSB status
+        if tsb < -15:
+            tsb_status_class = "tsb-overreach"
+            tsb_status_text = "⚠️ Overreaching"
+            recovery_days = int(abs(tsb) / 2)  # Rough estimate: 2 TSB points per day of recovery
+            recommendation = f"🛌 Take {recovery_days} easy days to recover"
+        elif tsb < -5:
+            tsb_status_class = "tsb-fatigue"
+            tsb_status_text = "🔥 High Fatigue"
+            recovery_days = int(abs(tsb + 5) / 2)
+            recommendation = f"😴 Consider {recovery_days} lighter days"
+        elif tsb < 5:
+            tsb_status_class = "tsb-optimal"
+            tsb_status_text = "✅ Optimal Zone"
+            recommendation = "🎯 Perfect for quality training"
+        elif tsb < 15:
+            tsb_status_class = "tsb-fresh"
+            tsb_status_text = "🚀 Fresh & Ready"
+            recommendation = "💪 Great time for hard sessions"
+        else:
+            tsb_status_class = "tsb-detraining"
+            tsb_status_text = "💤 Very Fresh"
+            detraining_days = int((tsb - 10) / 1.5)  # Rough estimate
+            recommendation = f"🏃‍♂️ Add training load soon ({detraining_days}+ days fresh)"
+        
+        st.markdown("**📊 Current Metrics**")
+        
+        # Compact metric cards
+        st.markdown(f"""
+        <div class="metric-cards-container">
+            <div class="metric-card-modern">
+                <span class="metric-icon">🏋️</span>
+                <div class="metric-label">Fitness</div>
+                <div class="metric-value" style="color: #667eea;">{latest['CTL']:.1f}</div>
+                <div class="metric-trend">{ctl_trend_text}</div>
+                <div style="font-size: 0.6rem; opacity: 0.6; margin-top: 0.25rem;">Target: 80-120</div>
+            </div>
+            <div class="metric-card-modern">
+                <span class="metric-icon">⚡</span>
+                <div class="metric-label">Fatigue</div>
+                <div class="metric-value" style="color: #ff6b6b;">{latest['ATL']:.1f}</div>
+                <div class="metric-trend">{atl_trend_text}</div>
+                <div style="font-size: 0.6rem; opacity: 0.6; margin-top: 0.25rem;">Ratio: {(latest['CTL']/latest['ATL']):.1f}x</div>
+            </div>
+            <div class="metric-card-modern">
+                <span class="metric-icon">🎯</span>
+                <div class="metric-label">Form</div>
+                <div class="metric-value" style="color: #feca57;">{latest['TSB']:.1f}</div>
+                <div class="metric-trend">{tsb_trend_text}</div>
+                <div style="font-size: 0.6rem; opacity: 0.6; margin-top: 0.25rem;">Optimal: -10 to +10</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # TSB Meter
+        st.markdown(f"""
+        <div class="tsb-meter-container">
+            <div class="tsb-meter-title">📊 Training Status Meter</div>
+            <div class="tsb-gauge">
+                <div class="tsb-gauge-bg">
+                    <div class="tsb-gauge-overlay"></div>
+                    <div class="tsb-needle" style="transform: translateX(-50%) rotate({needle_angle}deg);"></div>
+                    <div class="tsb-value-display">{tsb:.1f}</div>
+                </div>
+            </div>
+            <div class="tsb-labels">
+                <span>Overreach</span>
+                <span>Fatigue</span>
+                <span>Optimal</span>
+                <span>Fresh</span>
+                <span>Detraining</span>
+            </div>
+            <div class="tsb-status {tsb_status_class}">{tsb_status_text}</div>
+            <div class="tsb-recommendation">{recommendation}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Quick insights
+        fitness_fatigue_ratio = latest['CTL'] / latest['ATL'] if latest['ATL'] > 0 else 0
+        recent_7d_tss = df[df['Date'] >= (latest['Date'] - timedelta(days=6))]['TSS'].sum()
+        
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin: 1rem 0;">
+            <div class="metric-card-modern">
+                <span class="metric-icon">⚖️</span>
+                <div class="metric-label">Fitness/Fatigue</div>
+                <div class="metric-value" style="color: #9c88ff;">{fitness_fatigue_ratio:.2f}</div>
+                <div class="metric-trend">{'Balanced' if 1.2 <= fitness_fatigue_ratio <= 1.8 else 'Imbalanced'}</div>
+            </div>
+            <div class="metric-card-modern">
+                <span class="metric-icon">📅</span>
+                <div class="metric-label">7-Day TSS</div>
+                <div class="metric-value" style="color: #26d0ce;">{recent_7d_tss:.0f}</div>
+                <div class="metric-trend">Last week</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Collapsible sections for less clutter
     col1, col2 = st.columns(2)

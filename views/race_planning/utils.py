@@ -5,6 +5,7 @@ Utility functions for race planning module.
 import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
+from utils.date_parser import parse_race_date, parse_training_date
 
 
 def parse_day_cell(cell):
@@ -246,18 +247,19 @@ def initialize_week_selection(race_id, race, weeks):
         
         for idx, w in enumerate(weeks):
             try:
-                start_date = pd.to_datetime(w.get("start_date", "")).date()
-                end_date = start_date + timedelta(days=6)
-                
-                # Check if this is the race week
-                race_date_val = pd.to_datetime(race.get("date", ""), errors="coerce")
-                if not pd.isnull(race_date_val) and start_date <= race_date_val.date() <= end_date:
-                    race_week_idx = idx
-                
-                # Check if this is the current week
-                if start_date <= today_date <= end_date:
-                    current_week_idx = idx
-                    break
+                start_date = parse_training_date(w.get("start_date", ""))
+                if start_date:
+                    end_date = start_date + timedelta(days=6)
+                    
+                    # Check if this is the race week
+                    race_date_val = parse_race_date(race.get("date", ""))
+                    if race_date_val and start_date <= race_date_val <= end_date:
+                        race_week_idx = idx
+                    
+                    # Check if this is the current week
+                    if start_date <= today_date <= end_date:
+                        current_week_idx = idx
+                        break
             except:
                 continue
         
@@ -293,8 +295,8 @@ def update_race_plan(race, race_id, form_data, races, weeks, user_info, gist_id,
     from views.race_planning.data import save_races, save_training_plan
     
     # Check if dates have changed
-    old_race_date = pd.to_datetime(race.get("date", form_data["date"])).date() if race.get("date") else form_data["date"]
-    old_start_date = pd.to_datetime(race.get("training_start_date", form_data["training_start_date"])).date() if race.get("training_start_date") else form_data["training_start_date"]
+    old_race_date = parse_race_date(race.get("date", form_data["date"])) if race.get("date") else form_data["date"]
+    old_start_date = parse_training_date(race.get("training_start_date", form_data["training_start_date"])) if race.get("training_start_date") else form_data["training_start_date"]
     new_race_date = form_data["date"]
     new_start_date = form_data["training_start_date"]
     
@@ -306,7 +308,7 @@ def update_race_plan(race, race_id, form_data, races, weeks, user_info, gist_id,
         new_num_weeks = max(1, ((new_plan_race_week_start - new_plan_start).days // 7) + 1)
         new_week_starts = [new_plan_start + timedelta(days=7*w) for w in range(new_num_weeks)]
         
-        old_weeks_by_start = {pd.to_datetime(w.get("start_date")).date(): w for w in weeks if w.get("start_date")}
+        old_weeks_by_start = {parse_training_date(w.get("start_date")): w for w in weeks if w.get("start_date") and parse_training_date(w.get("start_date"))}
         new_weeks = []
         
         for i, week_start in enumerate(new_week_starts):
@@ -342,11 +344,12 @@ def update_race_plan(race, race_id, form_data, races, weeks, user_info, gist_id,
             # Find the race week
             race_week = None
             for week in new_weeks:
-                week_start = pd.to_datetime(week["start_date"]).date()
-                week_end = week_start + timedelta(days=6)
-                if week_start <= new_race_date <= week_end:
-                    race_week = week
-                    break
+                week_start = parse_training_date(week["start_date"])
+                if week_start:
+                    week_end = week_start + timedelta(days=6)
+                    if week_start <= new_race_date <= week_end:
+                        race_week = week
+                        break
             
             if race_week:
                 race_week[day_names[race_week_idx]] = {"distance": form_data["distance"], "description": "Race day"}

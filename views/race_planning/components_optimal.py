@@ -5,7 +5,8 @@ Optimized UI components for race planning module with table-centric design.
 import streamlit as st
 import pandas as pd
 import altair as alt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode, DataReturnMode
 
 # Import calendar component with fallback
 try:
@@ -30,6 +31,7 @@ except ImportError:
 from views.race_planning.data import save_races, save_training_plan, save_progress_feedback, load_training_plans
 from views.race_planning.utils import create_empty_training_plan
 from views.race_planning.plan_generators import generate_ai_training_plan, generate_ai_analysis
+from utils.date_parser import parse_race_date, parse_training_date, format_date_for_display, safe_parse_date_series
 
 
 def render_race_selector(races, plans, today, selected_race_id=None):
@@ -52,9 +54,9 @@ def render_race_selector(races, plans, today, selected_race_id=None):
     for race in races:
         race_id = race.get("id")
         race_name = race.get("name", "Unnamed Race")
-        race_date = pd.to_datetime(race.get("date", "")).date()
+        race_date = parse_race_date(race.get("date", ""))
         race_distance = race.get("distance", 0)
-        days_to_race = (race_date - today).days
+        days_to_race = (race_date - today).days if race_date else 0
         
         # Status text
         if days_to_race < 0:
@@ -116,17 +118,18 @@ def render_training_plan_table(race, weeks, today, df, user_info, gist_id, filen
     weeks = sorted(weeks, key=lambda w: w.get("week_number", 0))
     
     # Race date for highlighting race week
-    race_date = pd.to_datetime(race.get("date", "")).date()
+    race_date = parse_race_date(race.get("date", ""))
     
     # Initialize session state for selected week if not already set
     if "selected_week_idx" not in st.session_state:
         # Find current week
         for i, week in enumerate(weeks):
-            start_date = pd.to_datetime(week.get("start_date", ""), dayfirst=True).date()
-            end_date = start_date + timedelta(days=6)
-            if start_date <= today <= end_date:
-                st.session_state["selected_week_idx"] = i
-                break
+            start_date = parse_training_date(week.get("start_date", ""))
+            if start_date:
+                end_date = start_date + timedelta(days=6)
+                if start_date <= today <= end_date:
+                    st.session_state["selected_week_idx"] = i
+                    break
         
         # If no current week found, use first week
         if "selected_week_idx" not in st.session_state and weeks:
@@ -136,10 +139,16 @@ def render_training_plan_table(race, weeks, today, df, user_info, gist_id, filen
     data = []
     for i, week in enumerate(weeks):
         week_num = int(week.get("week_number", i+1))
-        start_date = pd.to_datetime(week.get("start_date", ""), dayfirst=True).date()
-        end_date = start_date + timedelta(days=6)
-        is_current_week = start_date <= today <= end_date
-        is_race_week = start_date <= race_date <= end_date
+        start_date = parse_training_date(week.get("start_date", ""))
+        if start_date:
+            end_date = start_date + timedelta(days=6)
+            is_current_week = start_date <= today <= end_date
+            is_race_week = race_date and start_date <= race_date <= end_date
+        else:
+            end_date = None
+            is_current_week = False
+            is_race_week = False
+        
         mon = week.get("monday", {})
         tue = week.get("tuesday", {})
         wed = week.get("wednesday", {})
@@ -149,10 +158,13 @@ def render_training_plan_table(race, weeks, today, df, user_info, gist_id, filen
         sun = week.get("sunday", {})
         week_total = sum(float(day.get("distance", 0)) for day in [mon, tue, wed, thu, fri, sat, sun])
         comment = week.get("comment", "")
+        
+        date_str = f"{start_date.strftime('%b %d')} - {end_date.strftime('%b %d')}" if start_date and end_date else "Invalid Date"
+        
         data.append({
             "week_idx": int(i),
             "Week": f"Week {week_num}",
-            "Dates": f"{start_date.strftime('%b %d')} - {end_date.strftime('%b %d')}",
+            "Dates": date_str,
             "Monday": f"{mon.get('distance', 0)} km - {mon.get('description', 'Rest')}" if float(mon.get('distance', 0)) > 0 else "Rest",
             "Tuesday": f"{tue.get('distance', 0)} km - {tue.get('description', 'Rest')}" if float(tue.get('distance', 0)) > 0 else "Rest",
             "Wednesday": f"{wed.get('distance', 0)} km - {wed.get('description', 'Rest')}" if float(wed.get('distance', 0)) > 0 else "Rest",
@@ -172,11 +184,12 @@ def render_training_plan_table(race, weeks, today, df, user_info, gist_id, filen
     # Find the actual current week (where today falls)
     current_week_idx = None
     for i, week in enumerate(weeks):
-        start_date = pd.to_datetime(week.get("start_date", ""), dayfirst=True).date()
-        end_date = start_date + timedelta(days=6)
-        if start_date <= today <= end_date:
-            current_week_idx = i
-            break
+        start_date = parse_training_date(week.get("start_date", ""))
+        if start_date:
+            end_date = start_date + timedelta(days=6)
+            if start_date <= today <= end_date:
+                current_week_idx = i
+                break
     
     # Always use current week as default selection
     selected_week = st.session_state.get("selected_week_idx")
@@ -367,7 +380,7 @@ def render_simplified_week_calendar(race, week, week_idx, today, user_info, gist
     try:
         # Week data
         week_num = week.get("week_number", week_idx+1)
-        start_date = pd.to_datetime(week.get("start_date", ""), dayfirst=True).date()
+        start_date = parse_training_date(week.get("start_date", ""))
         end_date = start_date + timedelta(days=6)
         
         # Load all weeks to enable navigation
@@ -802,7 +815,7 @@ def render_plan_generation_tools(race_id, race, weeks, user_info, gist_id, filen
         st.markdown("### 🤖 AI Training Plan Generator")
         
         # Compact race info
-        race_date = pd.to_datetime(race.get("date", "")).date()
+        race_date = parse_race_date(race.get("date", ""))
         race_distance = race.get("distance", 0)
         race_name = race.get("name", "")
         days_to_race = (race_date - datetime.today().date()).days
@@ -880,7 +893,7 @@ def render_plan_generation_tools(race_id, race, weeks, user_info, gist_id, filen
         
         with col2:
             # The end date is automatically the race date
-            race_date = pd.to_datetime(race.get("date", "")).date()
+            race_date = parse_race_date(race.get("date", ""))
             days_to_race = (race_date - start_date).days
             weeks_to_race = days_to_race // 7
             
@@ -928,7 +941,7 @@ def render_weekly_comparison_chart(race, weeks, df):
     
     for week in sorted(weeks, key=lambda w: w.get("week_number", 0)):
         week_num = week.get("week_number", 0)
-        start_date = pd.to_datetime(week.get("start_date", ""), dayfirst=True).date()
+        start_date = parse_training_date(week.get("start_date", ""))
         end_date = start_date + timedelta(days=6)
         
         # Planned distance
@@ -950,8 +963,9 @@ def render_weekly_comparison_chart(race, weeks, df):
                 distance_col = next((col for col in df.columns if 'distance' in col.lower()), None)
                 
                 if date_col and distance_col:
-                    actual_df = df[(pd.to_datetime(df[date_col], dayfirst=True).dt.date >= start_date) & 
-                                  (pd.to_datetime(df[date_col], dayfirst=True).dt.date <= end_date)]
+                    # Use safe date parsing for the dataframe
+                    df_dates = safe_parse_date_series(df[date_col], 'date')
+                    actual_df = df[(df_dates >= start_date) & (df_dates <= end_date)]
                     actual_distance = actual_df[distance_col].sum() if not actual_df.empty else 0
                 else:
                     if week_num == 1:  # Only show warning once
@@ -1430,7 +1444,7 @@ def render_race_settings_form(selected_race, selected_race_id, races, user_info,
         with col1:
             race_date = st.date_input(
                 "Race Date", 
-                value=pd.to_datetime(selected_race.get("date", datetime.today())).date()
+                value=parse_race_date(selected_race.get("date", datetime.today())) or datetime.today().date()
             )
         with col2:
             race_distance = st.number_input(
@@ -1464,7 +1478,7 @@ def render_race_settings_form(selected_race, selected_race_id, races, user_info,
         with col2:
             training_start_date = st.date_input(
                 "Training Start Date", 
-                value=pd.to_datetime(selected_race.get("training_start_date", datetime.today())).date()
+                value=parse_training_date(selected_race.get("training_start_date", datetime.today())) or datetime.today().date()
             )
         
         notes = st.text_area("Notes", value=selected_race.get("notes", ""), height=100)

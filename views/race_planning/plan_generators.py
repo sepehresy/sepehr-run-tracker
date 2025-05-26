@@ -4,11 +4,13 @@ Training plan generators for race planning module.
 
 import streamlit as st
 import openai
+from datetime import datetime, timedelta
 from views.ai_prompt import generate_ai_plan_prompt
 from utils.gsheet import fetch_gsheet_plan
 from utils.parse_helper import parse_training_plan
 from views.race_planning.utils import parse_day_cell
 from views.race_planning.data import save_training_plan
+from utils.date_parser import parse_race_date, parse_training_date
 
 
 # Path to debug file for AI plan generation
@@ -77,13 +79,45 @@ def generate_ai_training_plan(race_id, race, weeks, ai_note, user_info, gist_id,
         ai_table_md = response.choices[0].message.content
     
     # Parse AI response
-    df = parse_training_plan(ai_table_md)
-    required_cols = ["Week", "Start Date", "Monday", "Tuesday", 
-                    "Wednesday", "Thursday", "Friday", "Saturday", 
-                    "Sunday", "Total", "Comment"]
-    
-    if df is None or not all(col in df.columns for col in required_cols):
-        raise ValueError("AI plan table format is invalid. Please try again or edit manually.")
+    try:
+        df = parse_training_plan(ai_table_md)
+        required_cols = ["Week", "Start Date", "Monday", "Tuesday", 
+                        "Wednesday", "Thursday", "Friday", "Saturday", 
+                        "Sunday", "Total", "Comment"]
+        
+        # Debug: Show parsing results
+        st.info(f"📊 Parsed {len(df)} weeks from AI response")
+        
+        if df is None or not all(col in df.columns for col in required_cols):
+            # Show debug info for CSV parsing issues
+            st.error("[❌ Parse Error] AI training plan format is invalid.")
+            st.text("Debug information:")
+            
+            # Import and use debug helper
+            from utils.parse_helper import debug_csv_structure
+            debug_csv_structure(ai_table_md)
+            
+            # Show the raw AI response for debugging
+            with st.expander("🔍 View Raw AI Response"):
+                st.text(ai_table_md)
+            
+            raise ValueError("AI plan table format is invalid. Please try again or edit manually.")
+            
+    except Exception as e:
+        # Enhanced error handling for CSV parsing
+        st.error(f"[❌ Parse Error] Could not parse CSV: {e}")
+        
+        # Import and use debug helper
+        from utils.parse_helper import debug_csv_structure
+        debug_csv_structure(ai_table_md)
+        
+        # Show the raw AI response for debugging
+        with st.expander("🔍 View Raw AI Response for Debugging"):
+            st.text(ai_table_md)
+        
+        # Return default empty weeks instead of failing completely
+        st.warning("⚠️ Falling back to empty training plan. You can edit it manually.")
+        return default_weeks
     
     # Convert dataframe to weeks format
     new_weeks = []
@@ -109,6 +143,67 @@ def generate_ai_training_plan(race_id, race, weeks, ai_note, user_info, gist_id,
         )
         
         new_weeks.append(week)
+    
+    # Check if race week is missing and add it if needed
+    import pandas as pd
+    
+    race_date = parse_race_date(race.get('date', ''))
+    expected_weeks = len(weeks)  # Original number of weeks expected
+    
+    # Find if race week exists
+    race_week_exists = False
+    for week in new_weeks:
+        week_start = parse_training_date(week['start_date'])
+        week_end = week_start + timedelta(days=6)
+        if week_start <= race_date <= week_end:
+            race_week_exists = True
+            break
+    
+    # If race week is missing, add it
+    if not race_week_exists and len(new_weeks) > 0:
+        st.warning(f"⚠️ Race week (containing {race_date}) was missing from AI plan. Adding it...")
+        
+        # Calculate race week start (Monday of race week)
+        race_week_start = race_date - timedelta(days=race_date.weekday())
+        
+        # Determine which day the race is on
+        race_day_name = race_date.strftime('%A').lower()
+        
+        # Create race week
+        race_week = {
+            "week_number": len(new_weeks) + 1,
+            "start_date": race_week_start.strftime('%Y-%m-%d'),
+            "monday": {"distance": 0.0, "description": "Rest"},
+            "tuesday": {"distance": 0.0, "description": "Rest"},
+            "wednesday": {"distance": 4.0, "description": "Easy shakeout run"},
+            "thursday": {"distance": 0.0, "description": "Rest"},
+            "friday": {"distance": 3.0, "description": "Easy run + 4x100m strides"},
+            "saturday": {"distance": 0.0, "description": "Rest"},
+            "sunday": {"distance": 0.0, "description": "Rest"},
+            "comment": f"Race Week - {race.get('name', 'Race')} on {race_date.strftime('%A %B %d')}"
+        }
+        
+        # Set the race day
+        race_distance = race.get('distance', 21.1)  # Default to half marathon
+        race_week[race_day_name] = {
+            "distance": race_distance, 
+            "description": f"🏁 RACE DAY - {race.get('name', 'Race')} ({race_distance}km)"
+        }
+        
+        # Calculate total distance
+        race_week["total_distance"] = sum(
+            race_week[day]["distance"] for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        )
+        
+        new_weeks.append(race_week)
+        st.success(f"✅ Added race week containing race day ({race_date}) as Week {len(new_weeks)}")
+    
+    st.success(f"🎯 Generated {len(new_weeks)} weeks total (including race week)")
+    
+    # Ensure all weeks are consecutive with no gaps
+    new_weeks = ensure_consecutive_weeks(new_weeks, race.get('training_start_date', ''), race.get('date', ''))
+    
+    st.info(f"✅ Ensured consecutive weeks: {len(new_weeks)} total weeks with no gaps")
     
     # Update session state and save to gist
     st.session_state[f"plan_buffer_{race_id}"] = new_weeks
@@ -274,4 +369,73 @@ def generate_ai_analysis(race_id, race, user_info, gist_id, filename, token, pla
         }
         save_progress_feedback(race_id, entry, user_info, gist_id, filename, token)
     
-    return ai_feedback 
+    return ai_feedback
+
+
+def ensure_consecutive_weeks(weeks_list, training_start_date, race_date):
+    """
+    Ensure all weeks are consecutive with no gaps, filling missing weeks with rest days.
+    
+    Args:
+        weeks_list: List of week dictionaries from AI
+        training_start_date: Training start date (string)
+        race_date: Race date (string)
+        
+    Returns:
+        List of weeks with no gaps
+    """
+    if not weeks_list:
+        return weeks_list
+    
+    # Parse dates
+    start_date = parse_training_date(training_start_date)
+    end_date = parse_race_date(race_date)
+    
+    if not start_date or not end_date:
+        return weeks_list  # Return original if we can't parse dates
+    
+    # Calculate the Monday of the first week
+    first_monday = start_date - timedelta(days=start_date.weekday())
+    
+    # Calculate the Monday of the race week  
+    race_monday = end_date - timedelta(days=end_date.weekday())
+    
+    # Calculate total weeks needed
+    total_weeks = ((race_monday - first_monday).days // 7) + 1
+    
+    # Create a dictionary of existing weeks by start date
+    existing_weeks = {}
+    for week in weeks_list:
+        week_start = parse_training_date(week.get('start_date', ''))
+        if week_start:
+            existing_weeks[week_start] = week
+    
+    # Generate all consecutive weeks
+    consecutive_weeks = []
+    for week_num in range(total_weeks):
+        week_monday = first_monday + timedelta(days=7 * week_num)
+        
+        if week_monday in existing_weeks:
+            # Use existing week but ensure correct week number and start date
+            week = existing_weeks[week_monday].copy()
+            week['week_number'] = week_num + 1
+            week['start_date'] = week_monday.strftime('%Y-%m-%d')
+        else:
+            # Create missing week with rest days
+            week = {
+                "week_number": week_num + 1,
+                "start_date": week_monday.strftime('%Y-%m-%d'),
+                "monday": {"distance": 0.0, "description": "Rest"},
+                "tuesday": {"distance": 0.0, "description": "Rest"},
+                "wednesday": {"distance": 0.0, "description": "Rest"},
+                "thursday": {"distance": 0.0, "description": "Rest"},
+                "friday": {"distance": 0.0, "description": "Rest"},
+                "saturday": {"distance": 0.0, "description": "Rest"},
+                "sunday": {"distance": 0.0, "description": "Rest"},
+                "comment": "Recovery/Rest Week - All rest days",
+                "total_distance": 0.0
+            }
+        
+        consecutive_weeks.append(week)
+    
+    return consecutive_weeks 

@@ -2,6 +2,7 @@
 import pandas as pd
 from datetime import datetime, timedelta
 import streamlit as st
+from utils.date_parser import safe_parse_date, parse_race_date, parse_training_date
 
 def generate_ai_prompt(selected_race, today_str, race_date, plan_df, chart_df, lap_text, previous_notes):
     st.markdown('<span style="font-size:1.5rem;vertical-align:middle;">🤖</span> <span style="font-size:1.25rem;font-weight:600;vertical-align:middle;">AI Prompt</span>', unsafe_allow_html=True)
@@ -30,17 +31,18 @@ def generate_ai_prompt(selected_race, today_str, race_date, plan_df, chart_df, l
     
     # Limit training plan data to current and next 4 weeks only
     if plan_df is not None and not plan_df.empty:
-        today = pd.to_datetime(today_str).date()
+        today = safe_parse_date(today_str, 'date')
         current_week_idx = None
         
         # Find current week
         for i, row in plan_df.iterrows():
             if "Start Date" in row:
-                start = pd.to_datetime(row["Start Date"], errors='coerce', dayfirst=True).date()
-                end = start + pd.Timedelta(days=6)
-                if start <= today <= end:
-                    current_week_idx = i
-                    break
+                start = parse_training_date(row["Start Date"])
+                if start:
+                    end = start + pd.Timedelta(days=6)
+                    if start <= today <= end:
+                        current_week_idx = i
+                        break
         
         # Include current week and next 3-4 weeks
         if current_week_idx is not None:
@@ -55,32 +57,34 @@ def generate_ai_prompt(selected_race, today_str, race_date, plan_df, chart_df, l
         plan_csv = "No training plan data available"
 
     # Find current week and day for more context
-    today = pd.to_datetime(today_str).date()
+    today = safe_parse_date(today_str, 'date')
     current_week_num = None
     current_week_idx = None
     for i, row in plan_df.iterrows():
         if "Start Date" in row:
-            start = pd.to_datetime(row["Start Date"], errors='coerce', dayfirst=True).date()
-            end = start + pd.Timedelta(days=6)
-            if start <= today <= end:
-                current_week_num = row.get("Week", f"Week {i+1}")
-                current_week_idx = i
-                break
+            start = parse_training_date(row["Start Date"])
+            if start:
+                end = start + pd.Timedelta(days=6)
+                if start <= today <= end:
+                    current_week_num = row.get("Week", f"Week {i+1}")
+                    current_week_idx = i
+                    break
 
     # Find the current week's plan and what is left (from today onward)
     plan_left_str = ""
     if current_week_idx is not None and current_week_idx < len(plan_df):
         week_row = plan_df.iloc[current_week_idx]
         if "Start Date" in week_row:
-            week_start = pd.to_datetime(week_row["Start Date"], errors='coerce', dayfirst=True).date()
-            days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-            today_idx = (today - week_start).days
-            plan_left = []
-            for i, day in enumerate(days):
-                if i >= today_idx and day in week_row:
-                    day_plan = week_row.get(day, "")
-                    plan_left.append(f"{day}: {day_plan}")
-            plan_left_str = "\n".join(plan_left)
+            week_start = parse_training_date(week_row["Start Date"])
+            if week_start:
+                days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+                today_idx = (today - week_start).days
+                plan_left = []
+                for i, day in enumerate(days):
+                    if i >= today_idx and day in week_row:
+                        day_plan = week_row.get(day, "")
+                        plan_left.append(f"{day}: {day_plan}")
+                plan_left_str = "\n".join(plan_left)
 
     # Use get_race_and_profile_info for consistent info formatting
     race_info_block, num_weeks = get_race_and_profile_info(selected_race)
@@ -126,14 +130,20 @@ def get_race_and_profile_info(race_info):
         race_date_str = race_info.get('date','')
         if not start_date_str or not race_date_str:
             raise ValueError('Missing training_start_date or race_date')
-        start_date = pd.to_datetime(start_date_str, errors='coerce', dayfirst=True)
-        race_date = pd.to_datetime(race_date_str, errors='coerce', dayfirst=True)
-        if pd.isnull(start_date) or pd.isnull(race_date):
+        start_date = parse_training_date(start_date_str)
+        race_date = parse_race_date(race_date_str)
+        if not start_date or not race_date:
             raise ValueError('Invalid date format for training_start_date or race_date')
-        # Align both to Monday
-        start_monday = start_date - pd.Timedelta(days=start_date.weekday())
-        race_monday = race_date - pd.Timedelta(days=race_date.weekday())
-        num_weeks = ((race_monday - start_monday).days // 7) + 1
+        
+        # Calculate weeks more accurately
+        # Get the number of days between dates
+        days_diff = (race_date - start_date).days
+        # Calculate weeks (including the week containing the race day)
+        num_weeks = (days_diff // 7) + 1
+        
+        # Debug info to help troubleshoot
+        print(f"Debug - Start: {start_date}, Race: {race_date}, Days: {days_diff}, Weeks: {num_weeks}")
+        
     except Exception as e:
         print(f"[AI PLAN PROMPT] Failed to calculate num_weeks: {e}")
         num_weeks = None
@@ -269,11 +279,13 @@ def generate_ai_plan_prompt(race_info, ai_notes=None):
 
     ⛔ STRICT FINAL INSTRUCTIONS:
     - **CSV ONLY**: You MUST return only the CSV formatted text as described. No other text, explanation, or formatting.
-    - **ROW COUNT**: Output exactly the {num_weeks} weeks for the plan (plus the header). No more, no fewer.
+    - **ROW COUNT**: Output exactly {num_weeks if num_weeks is not None else '[calculated total]'} weeks for the plan (plus the header). No more, no fewer. THE FINAL WEEK MUST BE THE RACE WEEK containing the race date {race_info.get('date', '')}.
+    - **CONSECUTIVE WEEKS**: ALL weeks must be consecutive with NO GAPS. Week 1, Week 2, Week 3... up to the race week. If the user has travel/rest periods, include those weeks with rest days (0.0 km) but DO NOT skip the week entirely.
     - **HEADER MATCH**: The header must match the specified format character-for-character.
+    - **RACE WEEK MANDATORY**: The final row MUST be the race week. On the day corresponding to the race date ({race_info.get('date', '')}), include the race as: "{race_info.get('distance', 'XX')} km: 🏁 RACE DAY - {race_info.get('name', 'Race')}. Execute race strategy and good luck!"
     - **ADHERENCE TO FORMAT**: If you are absolutely unable to generate a plan that adheres to ALL the above formatting and content rules (e.g., due to contradictory or insufficient input), output a single CSV row with an error message in the "Comment" field: `"Week","Dates","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Total","Comment"`
     `"Error","N/A","N/A","N/A","N/A","N/A","N/A","N/A","N/A","N/A","Error: Could not generate plan due to [brief reason, e.g., invalid dates, insufficient info]."`
-    This error CSV is a last resort; strive to generate the full plan. 
+    This error CSV is a last resort; strive to generate the full plan.
 
     """
 
