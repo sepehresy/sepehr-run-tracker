@@ -4,13 +4,13 @@ st.set_page_config(page_title="Sepehr's Running Dashboard", layout="wide")
 
 import pandas as pd
 from datetime import datetime
-from views.summary import render_summary
 from views.activities import render_activities
 from views.ai_analysis import render_ai_analysis
 from views.race_planning import render_race_planning
 from views.runner_profile import render_runner_profile
 from views.fatigue_analysis import render_fatigue_analysis
 from views.pace_calculator import render_pace_calculator
+from views.statistics_modular import render_statistics
 import requests
 import json
 from utils.gist_helpers import load_gist_data, save_gist_data
@@ -421,7 +421,7 @@ else:
 
     # Sidebar navigation
     # st.sidebar.title("📁 Dashboard View")
-    view = st.sidebar.radio("Navigate to:", ["📊 Summary", "📂 Activities", "🏁 Race Planning", "⏱️ Pace Calculator", "🧠 AI Analysis", "🧍 Runner Profile", "📊 Fatigue Analysis"])
+    view = st.sidebar.radio("Navigate to:", ["📈 Statistics", "📂 Activities", "🏁 Race Planning", "⏱️ Pace Calculator", "🧠 AI Analysis", "🧍 Runner Profile", "📊 Fatigue Analysis"])
 
     st.sidebar.markdown(f'<div style="position:fixed;bottom:1.5rem;left:0;width:100%;text-align:left;{APP_VERSION_STYLE}color:{APP_VERSION_COLOR};">v{APP_VERSION}</div>', unsafe_allow_html=True)
 
@@ -437,8 +437,8 @@ else:
         st.session_state.user_info["runner_profile"] = new_profile
 
     # Render views based on selected section
-    if view == "📊 Summary":
-        render_summary(df, today)
+    if view == "📈 Statistics":
+        render_statistics(df, today)
 
     elif view == "📂 Activities":
         render_activities(df, user_info, gist_id, gist_filename, github_token)

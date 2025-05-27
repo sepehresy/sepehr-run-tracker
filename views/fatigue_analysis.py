@@ -351,11 +351,11 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
     }
     
     /* Radio button styling */
-    .stRadio > div {
+    .fatigue-controls .stRadio > div {
         gap: 0.5rem !important;
     }
     
-    .stRadio label {
+    .fatigue-controls .stRadio label {
         background: rgba(255, 255, 255, 0.05) !important;
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 8px !important;
@@ -364,7 +364,7 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
         transition: all 0.2s ease !important;
     }
     
-    .stRadio label:hover {
+    .fatigue-controls .stRadio label:hover {
         background: rgba(255, 255, 255, 0.1) !important;
         border-color: rgba(255, 255, 255, 0.2) !important;
     }
@@ -696,7 +696,11 @@ def render_fatigue_analysis(df, today, user_info, gist_id, gist_filename, github
         "Last 4 Weeks": 28, "Last 3 Months": 90, "Last 6 Months": 180,
         "Last Year": 365, "Last 2 Years": 730, "All Time": None
     }
+    
+    # Wrap radio button with fatigue-controls class
+    st.markdown('<div class="fatigue-controls">', unsafe_allow_html=True)
     selected_range = st.radio("Time Range Selection", range_options, index=1, horizontal=True, label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Data preparation (unchanged logic)
     df = df.copy()

@@ -578,7 +578,7 @@ def render_simplified_week_calendar(race, week, week_idx, today, user_info, gist
         }
         
         /* Compact button styling */
-        div[data-testid="stButton"] button {
+        .main div[data-testid="stButton"] button {
             padding: 6px 12px !important;
             font-size: 11px !important;
             height: 28px !important;
@@ -593,21 +593,21 @@ def render_simplified_week_calendar(race, week, week_idx, today, user_info, gist
             transition: all 0.2s ease !important;
         }
         
-        div[data-testid="stButton"] button:hover {
+        .main div[data-testid="stButton"] button:hover {
             transform: translateY(-1px) !important;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
             border-color: rgba(255, 255, 255, 0.2) !important;
         }
         
         /* Primary button styling */
-        div[data-testid="stButton"] button[kind="primary"] {
+        .main div[data-testid="stButton"] button[kind="primary"] {
             background: linear-gradient(145deg, #667eea, #764ba2) !important;
             border: 1px solid rgba(255, 255, 255, 0.2) !important;
         }
         
         /* Target text inside buttons */
-        div[data-testid="stButton"] button p,
-        div[data-testid="stButton"] button span {
+        .main div[data-testid="stButton"] button p,
+        .main div[data-testid="stButton"] button span {
             font-size: 12px !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -1124,7 +1124,7 @@ def render_ai_analysis_section(race_id, race, weeks, df, user_info, gist_id, fil
     }
     
     /* Primary button enhancement */
-    .stButton button[kind="primary"] {
+    .main .stButton button[kind="primary"] {
         background: linear-gradient(145deg, #667eea, #764ba2) !important;
         border: none !important;
         border-radius: 12px !important;
@@ -1134,13 +1134,13 @@ def render_ai_analysis_section(race_id, race, weeks, df, user_info, gist_id, fil
         transition: all 0.2s ease !important;
     }
     
-    .stButton button[kind="primary"]:hover {
+    .main .stButton button[kind="primary"]:hover {
         transform: translateY(-2px) !important;
         box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4) !important;
     }
     
     /* Delete button styling */
-    .stButton button[title="Delete this analysis"] {
+    .main .stButton button[title="Delete this analysis"] {
         background: rgba(220, 53, 69, 0.1) !important;
         border: 1px solid rgba(220, 53, 69, 0.3) !important;
         color: #dc3545 !important;
@@ -1149,7 +1149,7 @@ def render_ai_analysis_section(race_id, race, weeks, df, user_info, gist_id, fil
         transition: all 0.2s ease !important;
     }
     
-    .stButton button[title="Delete this analysis"]:hover {
+    .main .stButton button[title="Delete this analysis"]:hover {
         background: rgba(220, 53, 69, 0.2) !important;
         border-color: #dc3545 !important;
         transform: scale(1.05) !important;
@@ -1529,8 +1529,8 @@ def render_race_settings_form(selected_race, selected_race_id, races, user_info,
 # Add some CSS to make the UI look cleaner
 st.markdown("""
 <style>
-    /* Style the buttons in the calendar */
-    button[kind="secondary"] {
+    /* Style the buttons in the calendar - specific to race planning */
+    .main button[kind="secondary"] {
         background-color: #272727 !important;
         color: #AAA !important;
         border: 1px solid #333 !important;
@@ -1539,13 +1539,13 @@ st.markdown("""
         font-size: 12px !important;
     }
     
-    button[kind="primary"] {
+    .main button[kind="primary"] {
         background-color: #FF4B4B !important;
         border-color: #FF4B4B !important;
     }
     
     /* Style input fields */
-    input[type="number"], input[type="text"] {
+    .main input[type="number"], .main input[type="text"] {
         background-color: #333 !important;
         color: white !important;
         border: 1px solid #444 !important;
@@ -1553,7 +1553,7 @@ st.markdown("""
     }
     
     /* Add card styling to columns */
-    div.css-1r6slb0 {
+    .main div.css-1r6slb0 {
         background-color: #1E1E1E;
         border: 1px solid #333;
         border-radius: 8px;
@@ -1570,28 +1570,28 @@ st.markdown('<div style="height: 20px;"></div>', unsafe_allow_html=True)
 # Improved button styling for better readability
 st.markdown('''
 <style>
-/* Improved global button styling */
-button {
+/* Improved global button styling - specific to race planning */
+.main button {
     font-size: 12px !important;
     padding: 6px 12px !important;
     min-height: 32px !important;
 }
 
-button p, button span {
+.main button p, .main button span {
     font-size: 12px !important;
     margin: 0 !important;
     padding: 0 !important;
 }
 
 /* Enhanced save/cancel buttons */
-.stButton button[kind="secondary"], .stButton button[kind="primary"] {
+.main .stButton button[kind="secondary"], .main .stButton button[kind="primary"] {
     font-size: 12px !important;
     padding: 8px 16px !important;
     min-height: 36px !important;
 }
 
-.stButton button[kind="secondary"] p, .stButton button[kind="primary"] p,
-.stButton button[kind="secondary"] span, .stButton button[kind="primary"] span {
+.main .stButton button[kind="secondary"] p, .main .stButton button[kind="primary"] p,
+.main .stButton button[kind="secondary"] span, .main .stButton button[kind="primary"] span {
     font-size: 12px !important;
 }
 </style>

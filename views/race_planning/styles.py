@@ -343,7 +343,8 @@ def load_app_css():
         border-radius: 6px !important;
     }
     
-    .stButton > button {
+    /* Race planning specific button styling - not affecting sidebar */
+    .main .stButton > button {
         border-radius: 6px !important;
         font-weight: 500 !important;
     }
