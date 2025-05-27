@@ -26,8 +26,12 @@ Transform your running data into beautiful, interactive visualizations with **AI
 - **Adaptive Time Filtering** - 7 days to All Time with AI recommendations
 - **Smart Aggregation Views** - Daily, Weekly, Monthly, Yearly with AI insights
 
+![Advanced Analytics](screenshots/advanced-analytics.png)
+
 ### ⚡ **Ultra-Compact Pace Calculator**
 Calculate race times and paces with an efficient 2-row design that maximizes screen space.
+
+![Pace Calculator](screenshots/pace-calculator.png)
 
 **Calculator Features:**
 - Row 1: Enter pace → get finish times for 5K, 10K, Half Marathon, Marathon
@@ -39,6 +43,8 @@ Calculate race times and paces with an efficient 2-row design that maximizes scr
 ### 📊 **Activities Management**
 Comprehensive workout data management and visualization system.
 
+![Route Analysis](screenshots/route-analysis.png)
+
 **Activity Features:**
 - Workout data import and processing
 - Performance metrics calculation
@@ -48,6 +54,8 @@ Comprehensive workout data management and visualization system.
 ### 📉 **AI-Powered Fatigue Analysis**
 Monitor your training load and recovery status with **AI-driven insights** and advanced metrics.
 
+![Training Load Analysis](screenshots/training-load.png)
+
 **🤖 AI Analysis Features:**
 - **Smart Training Load** - AI calculates optimal training intensity
 - **Intelligent Recovery Tracking** - AI predicts when you need rest
@@ -56,6 +64,8 @@ Monitor your training load and recovery status with **AI-driven insights** and a
 
 ### 🎯 **AI-Powered Race Planning**
 **Advanced artificial intelligence** creates personalized training plans tailored to your running goals and current fitness level.
+
+![Race Planning](screenshots/race-planning.png)
 
 **🤖 AI Planning Features:**
 - **Smart Training Plans** - AI analyzes your data to create optimal workout schedules
