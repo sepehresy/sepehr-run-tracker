@@ -1,22 +1,30 @@
 # 🏃‍♂️ RunTracker
 
-**Your intelligent running companion** - A comprehensive running analytics dashboard built with Streamlit that transforms your training data into actionable insights.
+**🤖 AI-POWERED Running Analytics & Training Plans** 
+
+**Your intelligent running companion** - A comprehensive running analytics dashboard built with Streamlit that transforms your training data into actionable insights using **artificial intelligence**.
+
+## 🧠 **AI-Powered Features**
+- **🎯 AI Training Plan Generation** - Personalized workout schedules created by advanced AI
+- **📊 AI Run Analysis** - Intelligent insights and recommendations from your training data
+- **🔮 AI Performance Predictions** - Smart forecasting for your running goals
+- **💡 AI Coaching Tips** - Personalized advice based on your training patterns
 
 ![RunTracker Login](screenshots/login.png)
 
 ## ✨ Features
 
-### 📊 **Comprehensive Analytics Dashboard**
-Transform your running data into beautiful, interactive visualizations with mobile-optimized responsive design.
+### 📊 **AI-Enhanced Analytics Dashboard**
+Transform your running data into beautiful, interactive visualizations with **AI-powered insights** and mobile-optimized responsive design.
 
 ![Running Analytics Dashboard](screenshots/analytics-dashboard.png)
 
-**Key Metrics at a Glance:**
-- Total Distance & Runs
-- Average Pace & Heart Rate  
-- Training Load & Elevation Gain
-- Time-based filtering (7 days to All Time)
-- Multiple aggregation views (Daily, Weekly, Monthly, Yearly)
+**🤖 AI-Enhanced Metrics:**
+- **Smart Performance Analysis** - AI identifies trends and patterns in your data
+- **Intelligent Workout Classification** - AI automatically categorizes your runs
+- **Predictive Training Load** - AI calculates optimal training intensity
+- **Adaptive Time Filtering** - 7 days to All Time with AI recommendations
+- **Smart Aggregation Views** - Daily, Weekly, Monthly, Yearly with AI insights
 
 ### ⚡ **Ultra-Compact Pace Calculator**
 Calculate race times and paces with an efficient 2-row design that maximizes screen space.
@@ -37,23 +45,24 @@ Comprehensive workout data management and visualization system.
 - Activity history and trends
 - Data export capabilities
 
-### 📉 **Fatigue Analysis**
-Monitor your training load and recovery status with advanced metrics.
+### 📉 **AI-Powered Fatigue Analysis**
+Monitor your training load and recovery status with **AI-driven insights** and advanced metrics.
 
-**Analysis Features:**
-- Training load calculation and tracking
-- Fatigue and recovery indicators
-- Performance trend analysis
-- Training recommendations
+**🤖 AI Analysis Features:**
+- **Smart Training Load** - AI calculates optimal training intensity
+- **Intelligent Recovery Tracking** - AI predicts when you need rest
+- **AI Performance Trends** - Machine learning identifies improvement patterns
+- **Personalized Recommendations** - AI coaching advice based on your data
 
-### 🎯 **Race Planning**
-AI-powered training plan generation for your running goals.
+### 🎯 **AI-Powered Race Planning**
+**Advanced artificial intelligence** creates personalized training plans tailored to your running goals and current fitness level.
 
-**Planning Features:**
-- Multiple race distance support
-- AI-generated training plans
-- Customizable workout schedules
-- Progress tracking capabilities
+**🤖 AI Planning Features:**
+- **Smart Training Plans** - AI analyzes your data to create optimal workout schedules
+- **Multiple Race Distances** - 5K, 10K, Half Marathon, Marathon support
+- **Adaptive Scheduling** - AI adjusts plans based on your progress and performance
+- **Intelligent Recommendations** - AI-driven coaching advice and training tips
+- **Performance Forecasting** - AI predicts your race times and goal achievement
 
 ## 🚀 Quick Start
 
@@ -93,12 +102,12 @@ RunTracker features a **mobile-first responsive design** that adapts seamlessly 
 
 ## 🛠️ Technology Stack
 
+- **🤖 AI Engine**: OpenAI GPT for intelligent training plans and analysis
 - **Frontend**: Streamlit with custom CSS/HTML
 - **Data Processing**: Pandas, NumPy for data manipulation
 - **Visualizations**: Plotly for interactive charts
 - **Authentication**: Session-based user management
 - **Data Storage**: GitHub Gist API for data persistence
-- **AI Integration**: OpenAI GPT for race planning features
 
 ## 📊 Data Sources
 
