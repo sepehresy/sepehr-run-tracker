@@ -148,25 +148,21 @@ Thank you for your interest in contributing to RunTracker! We welcome contributi
 - **Desktop**: Generous spacing for comfort
 - **Touch targets**: Minimum 44px for mobile
 
-## 🏃‍♂️ Feature Areas
+## 🏃‍♂️ Current Feature Areas
 
-### High Priority
-- **Performance optimization**
-- **Mobile user experience**
-- **Data visualization improvements**
-- **AI training plan enhancements**
+### Core Modules
+- **Statistics Dashboard** - Performance metrics and trend analysis
+- **Pace Calculator** - Ultra-compact pace and time calculations
+- **Activities View** - Workout data management and visualization
+- **Fatigue Analysis** - Training load and recovery metrics
+- **Race Planning** - AI-powered training plan generation
+- **Runner Profile** - User profile and preferences management
 
-### Medium Priority
-- **New chart types**
-- **Additional data sources**
-- **Export functionality**
-- **User preferences**
-
-### Future Considerations
-- **Social features**
-- **Wearable device integration**
-- **Advanced analytics**
-- **Nutrition tracking**
+### Technical Components
+- **Data Processing** - Time/pace parsing and workout type detection
+- **Mobile Optimization** - Responsive design and touch interfaces
+- **Authentication** - User login and session management
+- **Data Storage** - GitHub Gist integration for persistence
 
 ## 📊 Code Review Criteria
 

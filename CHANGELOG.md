@@ -10,104 +10,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🎉 Initial Release
 
 #### ✨ Added
-- **Comprehensive Analytics Dashboard** with mobile-optimized responsive design
-- **Advanced Performance Analytics** with correlation analysis and trend visualization
-- **Interactive Route Visualization** with OpenStreetMap integration
-- **Training Load Analysis** with CTL, ATL, and TSB metrics
-- **AI-Powered Race Planning** with personalized training plan generation
-- **Mobile-First Responsive Design** with glass-morphism UI
-- **Dark Theme** with WCAG AA compliant contrast ratios
-- **Multi-format Data Import** (Strava, Garmin, CSV, manual entry)
+- **Statistics Dashboard** with mobile-optimized responsive design
+- **Pace Calculator** with ultra-compact 2-row layout
+- **Activities View** for workout data management
+- **Fatigue Analysis** with training load metrics
+- **Race Planning** module with AI integration
+- **Runner Profile** management
+- **Dark Theme** with glass-morphism UI design
 
-#### 🏃‍♂️ Features
+#### 🏃‍♂️ Core Features
 - **Statistics Dashboard**:
-  - 8 key performance metrics with time-based filtering
-  - Mobile compact view (single card) vs desktop individual cards
-  - Performance trends with multiple aggregation options
-  - Heart rate zones distribution and analysis
+  - 8 key performance metrics (distance, runs, time, pace, heart rate, training load, elevation)
+  - Time-based filtering (7 days, 30 days, 90 days, 1 year, all time)
+  - Multiple aggregation views (daily, weekly, monthly, yearly)
+  - Mobile compact view (single summary card) vs desktop individual cards
+  - Performance trend charts with Plotly visualizations
+  - Workout type detection and classification
   
-- **Advanced Analytics**:
-  - Distance vs Pace correlation scatter plots
-  - Multi-dimensional performance correlations
-  - Workout type classification with visual legends
-  - Training load optimization insights
+- **Pace Calculator**:
+  - Ultra-compact 2-row design (75% space reduction from original)
+  - Row 1: Enter pace → get finish times for 5K, 10K, Half Marathon, Marathon
+  - Row 2: Enter finish times → get calculated paces
+  - Static reference table with common paces (4:00-10:00/km)
+  - Mobile-responsive (4→2 columns on mobile screens)
   
-- **Route Analysis**:
-  - Interactive map visualization with lap-by-lap breakdown
-  - Pace analysis with visual indicators (green/red)
-  - Elevation and heart rate tracking per segment
-  - Comprehensive performance metrics
-  
-- **Training Load**:
-  - Chronic Training Load (CTL) tracking
-  - Acute Training Load (ATL) monitoring
-  - Training Stress Balance (TSB) analysis
-  - Fitness trend analysis with recovery recommendations
-  
-- **Race Planning**:
-  - AI-generated training plans for 5K to Marathon
-  - Google Sheets integration for plan export
-  - Weekly progression with detailed workout descriptions
-  - Manual plan customization and adjustments
+- **Data Processing**:
+  - Time parsing for multiple formats (MM:SS:00, HH:MM:SS, MM:SS)
+  - Pace conversion between min:sec and decimal formats
+  - Workout type detection based on activity names and characteristics
+  - Training load calculation using distance and intensity factors
 
-#### 🎨 Design
-- **Mobile Optimization**:
-  - Responsive breakpoints: 30rem, 48rem, 64rem, 80rem
-  - Touch-friendly 44px minimum touch targets
-  - Progressive enhancement from mobile to desktop
-  - Optimized typography for all screen sizes
-  
-- **Visual Design**:
-  - Dark gradient background (#0f172a to #334155)
-  - Glass-morphism cards with backdrop blur effects
-  - Smooth animations and hover effects
-  - High contrast ratios (17.06:1) for accessibility
+#### 🎨 Mobile-First Design
+- **Responsive Breakpoints**: 30rem, 48rem, 64rem, 80rem
+- **Touch Targets**: Minimum 44px for mobile accessibility
+- **Typography**: Optimized font sizes (minimum 10px for compact layouts)
+- **Layout**: Progressive enhancement from mobile to desktop
+- **Color Scheme**: Dark gradient background (#0f172a to #334155)
+- **Cards**: Glass-morphism with backdrop blur effects
 
-#### 🛠️ Technical
+#### 🛠️ Technical Implementation
 - **Frontend**: Streamlit with custom CSS/HTML
-- **Data Processing**: Pandas, NumPy for efficient data handling
-- **Visualizations**: Plotly for interactive charts and graphs
-- **Mapping**: Folium with OpenStreetMap integration
-- **AI Integration**: OpenAI GPT for intelligent training plan generation
-- **Export Capabilities**: Google Sheets API integration
+- **Data Processing**: Pandas, NumPy for data manipulation
+- **Visualizations**: Plotly for interactive charts
+- **Authentication**: User login system with session management
+- **Data Storage**: GitHub Gist integration for data persistence
 
-#### 📱 Mobile Features
-- **Ultra-Compact Pace Calculator**: 75% space reduction with 2-row layout
-- **Responsive Statistics Cards**: Adaptive layout based on screen size
-- **Touch-Optimized Controls**: Enhanced mobile interaction experience
-- **Efficient Space Usage**: Maximized content visibility on small screens
-
-#### 🔧 Performance
-- **Load Time**: < 2 seconds for dashboard rendering
-- **Mobile Score**: 100% responsive design compliance
-- **Accessibility**: WCAG AA compliant contrast ratios
-- **Touch Targets**: 44px minimum for mobile usability
+#### 📱 Mobile Optimizations
+- **Statistics Cards**: Compact summary card for mobile, individual cards for desktop
+- **Pace Calculator**: Reduced padding and margins for ultra-compact layout
+- **Touch Interface**: Enhanced mobile interaction experience
+- **Responsive Grid**: Adaptive column layouts based on screen size
 
 ### 🐛 Bug Fixes
-- Fixed pace data processing for realistic running pace values
-- Resolved time parsing issues for accurate workout duration
-- Enhanced workout type detection algorithm
+- Fixed pace data processing to show realistic running pace values
+- Resolved time parsing issues for accurate workout duration calculation
+- Enhanced workout type detection algorithm for better classification
 - Improved mobile layout rendering consistency
 
 ### 📚 Documentation
-- Comprehensive README.md with feature screenshots
-- Complete setup and installation guide
-- Mobile testing documentation
-- API integration examples
-- Contributing guidelines
-
----
-
-## Future Releases
-
-### [1.1.0] - Planned
-- **Enhanced AI Features**: Smarter training recommendations
-- **Social Features**: Share workouts and compare with friends
-- **Advanced Metrics**: VO2 max estimation and power analysis
-- **Wearable Integration**: Direct sync with fitness devices
-
-### [1.2.0] - Planned
-- **Nutrition Tracking**: Integrate meal planning with training
-- **Weather Integration**: Weather-aware training recommendations
-- **Goal Setting**: Advanced goal tracking and achievement system
-- **Community Features**: Join running groups and challenges 
+- Comprehensive README.md with setup instructions
+- CHANGELOG.md for version tracking
+- CONTRIBUTING.md with development guidelines
+- LICENSE file (MIT License)
+- Requirements.txt with all dependencies 

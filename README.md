@@ -18,55 +18,42 @@ Transform your running data into beautiful, interactive visualizations with mobi
 - Time-based filtering (7 days to All Time)
 - Multiple aggregation views (Daily, Weekly, Monthly, Yearly)
 
-### 📈 **Advanced Performance Analytics**
-Deep dive into your training patterns with correlation analysis and trend visualization.
+### ⚡ **Ultra-Compact Pace Calculator**
+Calculate race times and paces with an efficient 2-row design that maximizes screen space.
 
-![Advanced Analytics](screenshots/advanced-analytics.png)
+**Calculator Features:**
+- Row 1: Enter pace → get finish times for 5K, 10K, Half Marathon, Marathon
+- Row 2: Enter finish times → get calculated paces
+- Static reference table with common paces (4:00-10:00/km)
+- Mobile-responsive design (4→2 columns on mobile)
+- 75% space reduction from traditional calculators
 
-**Advanced Features:**
-- Distance vs Pace correlation analysis
-- Heart Rate zones distribution
-- Workout type classification with visual legends
-- Multi-dimensional performance correlations
-- Training load optimization insights
+### 📊 **Activities Management**
+Comprehensive workout data management and visualization system.
 
-### 🗺️ **Interactive Route Visualization**
-Explore your running routes with detailed lap-by-lap analysis and performance metrics.
+**Activity Features:**
+- Workout data import and processing
+- Performance metrics calculation
+- Activity history and trends
+- Data export capabilities
 
-![Route Analysis](screenshots/route-analysis.png)
+### 📉 **Fatigue Analysis**
+Monitor your training load and recovery status with advanced metrics.
 
-**Route Features:**
-- Interactive map visualization with OpenStreetMap
-- Detailed lap splits with pace analysis
-- Elevation and heart rate tracking per segment
-- Visual pace indicators (green = good, red = slow)
-- Comprehensive performance breakdown
+**Analysis Features:**
+- Training load calculation and tracking
+- Fatigue and recovery indicators
+- Performance trend analysis
+- Training recommendations
 
-### 📉 **Training Load Analysis**
-Monitor your fitness progression with advanced training load metrics and recovery recommendations.
-
-![Training Load Analysis](screenshots/training-load.png)
-
-**Training Insights:**
-- CTL (Chronic Training Load) tracking
-- ATL (Acute Training Load) monitoring  
-- TSB (Training Stress Balance) analysis
-- Fitness trend analysis with recommendations
-- Recovery status and training guidance
-- Form and fatigue balance indicators
-
-### 🎯 **Race Planning & Training Programs**
-AI-powered training plan generation tailored to your goals and current fitness level.
-
-![Race Planning](screenshots/race-planning.png)
+### 🎯 **Race Planning**
+AI-powered training plan generation for your running goals.
 
 **Planning Features:**
-- Multiple race distance support (5K to Marathon)
-- AI-generated personalized training plans
-- Weekly progression with detailed workouts
-- Google Sheets integration for plan export
-- Manual training plan customization
-- Progress tracking and plan adjustments
+- Multiple race distance support
+- AI-generated training plans
+- Customizable workout schedules
+- Progress tracking capabilities
 
 ## 🚀 Quick Start
 
@@ -107,19 +94,19 @@ RunTracker features a **mobile-first responsive design** that adapts seamlessly 
 ## 🛠️ Technology Stack
 
 - **Frontend**: Streamlit with custom CSS/HTML
-- **Data Processing**: Pandas, NumPy
+- **Data Processing**: Pandas, NumPy for data manipulation
 - **Visualizations**: Plotly for interactive charts
-- **Mapping**: Folium with OpenStreetMap
-- **AI Integration**: OpenAI GPT for training plan generation
-- **Export**: Google Sheets API integration
+- **Authentication**: Session-based user management
+- **Data Storage**: GitHub Gist API for data persistence
+- **AI Integration**: OpenAI GPT for race planning features
 
 ## 📊 Data Sources
 
-RunTracker supports multiple data import formats:
-- **Strava exports** (GPX, TCX)
-- **Garmin Connect** data
-- **Manual entry** for custom workouts
-- **CSV imports** for bulk data
+RunTracker currently supports:
+- **Google Sheets** integration for data import
+- **GitHub Gist** for data storage and persistence
+- **Manual entry** through the web interface
+- **CSV data** processing capabilities
 
 ## 🎨 Design Philosophy
 
