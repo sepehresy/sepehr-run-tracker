@@ -176,4 +176,11 @@ logs/
 *.csv
 *.json
 data/
-uploads/ 
+uploads/
+
+# Screenshots directory structure (keep folder, ignore images)
+screenshots/*.png
+screenshots/*.jpg
+screenshots/*.jpeg
+screenshots/*.gif
+!screenshots/.gitkeep 
