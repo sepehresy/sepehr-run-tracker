@@ -2,7 +2,7 @@
 Metric cards and trend indicators for running statistics
 """
 import pandas as pd
-from .data_processing import format_time_from_minutes
+from .data_processing import format_time_from_minutes, format_pace_to_min_sec, format_number_with_commas, detect_workout_type
 
 
 def get_trend_indicator(change):
@@ -19,60 +19,84 @@ def get_trend_indicator(change):
         return "➡️", "neutral", "Stable"
 
 
-def create_metric_card(icon, value, label, unit="", change=None, subtitle="", goal_progress=None):
-    """Create an enhanced metric card with icons, trends, and optional goal progress"""
-    
-    # Format the change indicator
+def create_metric_card(title, value, change=None, icon="📊", color="#3b82f6"):
+    """Create a metric card with optional change indicator"""
     change_html = ""
     if change is not None:
-        trend_icon, trend_class, trend_desc = get_trend_indicator(change)
-        change_html = f"""
-        <div class="metric-change {trend_class}">
-            <span class="trend-icon">{trend_icon}</span>
-            <span class="trend-text">{abs(change):.1f}% vs prev period</span>
-            <div class="trend-tooltip">{trend_desc}</div>
-        </div>
-        """
+        change_color = "#10b981" if change >= 0 else "#ef4444"
+        change_symbol = "↗" if change >= 0 else "↘"
+        change_html = f'<div class="metric-change" style="color: {change_color};">{change_symbol} {abs(change):.1f}%</div>'
     
-    # Format goal progress bar
-    goal_html = ""
-    if goal_progress is not None:
-        progress_percent = min(100, goal_progress)
-        goal_html = f"""
-        <div class="goal-progress">
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: {progress_percent}%;"></div>
-            </div>
-            <div class="progress-text">{progress_percent:.0f}% of goal</div>
-        </div>
-        """
-    
-    return f"""
-    <div class="metric-card enhanced">
-        <div class="metric-header">
-            <span class="metric-icon">{icon}</span>
-            <div class="metric-main">
-                <div class="metric-value-container">
-                    <span class="metric-value">{value}</span>
-                    <span class="metric-unit">{unit}</span>
-                </div>
-                <div class="metric-label">{label}</div>
-                {f'<div class="metric-subtitle">{subtitle}</div>' if subtitle else ''}
-            </div>
-        </div>
-        {goal_html}
-        {change_html}
-    </div>
-    """
+    return f"""<div class="metric-card" style="border-left: 4px solid {color};"><div class="metric-icon">{icon}</div><div class="metric-content"><div class="metric-title">{title}</div><div class="metric-value">{value}</div>{change_html}</div></div>"""
 
 
-def create_all_metric_cards(metrics, time_period):
-    """Create all 8 metric cards with the calculated metrics"""
+def create_compact_summary_card(metrics, time_period):
+    """Create a compact summary card for mobile devices"""
     total_distance = metrics['total_distance']
     total_runs = metrics['total_runs']
     total_time = metrics['total_time']
     avg_distance = metrics['avg_distance']
-    avg_pace_seconds = metrics['avg_pace_seconds']
+    avg_pace_minutes = metrics['avg_pace_minutes']
+    avg_hr = metrics['avg_hr']
+    total_elevation = metrics['total_elevation']
+    training_load = metrics['training_load']
+    distance_change = metrics['distance_change']
+    runs_change = metrics['runs_change']
+    
+    # Format values for compact display
+    distance_value = f"{format_number_with_commas(total_distance)} km"
+    runs_value = f"{total_runs}"
+    time_value = format_time_from_minutes(total_time)
+    pace_value = format_pace_to_min_sec(avg_pace_minutes)
+    avg_distance_value = f"{avg_distance:.1f} km"
+    hr_value = f"{avg_hr:.0f} bpm" if avg_hr and not pd.isna(avg_hr) else "No data"
+    load_value = f"{training_load:.0f}"
+    elevation_value = f"{format_number_with_commas(total_elevation)} m"
+    
+    # Create period label
+    period_label = f"Last {time_period} Days" if time_period else "All Time"
+    
+    return f"""<div class="metric-summary-card"><div style="text-align: center; margin-bottom: 1rem;"><h3 style="color: #f8fafc; margin: 0; font-size: 1.125rem; font-weight: 600;">📊 Running Summary ({period_label})</h3></div><div class="metric-summary-grid"><div class="metric-summary-item"><div class="metric-summary-icon">🏃‍♂️</div><div class="metric-summary-label">Distance</div><div class="metric-summary-value">{distance_value}</div></div><div class="metric-summary-item"><div class="metric-summary-icon">📊</div><div class="metric-summary-label">Runs</div><div class="metric-summary-value">{runs_value}</div></div><div class="metric-summary-item"><div class="metric-summary-icon">⏱️</div><div class="metric-summary-label">Time</div><div class="metric-summary-value">{time_value}</div></div><div class="metric-summary-item"><div class="metric-summary-icon">⚡</div><div class="metric-summary-label">Avg Pace</div><div class="metric-summary-value">{pace_value}</div></div><div class="metric-summary-item"><div class="metric-summary-icon">📏</div><div class="metric-summary-label">Avg Dist</div><div class="metric-summary-value">{avg_distance_value}</div></div><div class="metric-summary-item"><div class="metric-summary-icon">❤️</div><div class="metric-summary-label">Avg HR</div><div class="metric-summary-value">{hr_value}</div></div><div class="metric-summary-item"><div class="metric-summary-icon">🔥</div><div class="metric-summary-label">Load</div><div class="metric-summary-value">{load_value}</div></div><div class="metric-summary-item"><div class="metric-summary-icon">⛰️</div><div class="metric-summary-label">Elevation</div><div class="metric-summary-value">{elevation_value}</div></div></div></div>"""
+
+
+def create_training_diversity_card(df_filtered):
+    """Create a card showing training diversity"""
+    if df_filtered.empty:
+        return create_metric_card("Training Variety", "No data", icon="🎯", color="#8b5cf6")
+    
+    # Calculate workout type diversity
+    df_with_types = df_filtered.copy()
+    df_with_types['workout_type'] = df_with_types.apply(detect_workout_type, axis=1)
+    workout_types = df_with_types['workout_type'].value_counts()
+    
+    # Calculate diversity score (number of different workout types)
+    diversity_score = len(workout_types)
+    total_runs = len(df_filtered)
+    
+    # Create a diversity description
+    if diversity_score >= 5:
+        diversity_text = f"Excellent ({diversity_score} types)"
+        color = "#10b981"
+    elif diversity_score >= 3:
+        diversity_text = f"Good ({diversity_score} types)"
+        color = "#3b82f6"
+    elif diversity_score >= 2:
+        diversity_text = f"Moderate ({diversity_score} types)"
+        color = "#f59e0b"
+    else:
+        diversity_text = f"Limited ({diversity_score} type)"
+        color = "#ef4444"
+    
+    return create_metric_card("Training Variety", diversity_text, icon="🎯", color=color)
+
+
+def create_all_metric_cards(metrics, time_period):
+    """Create all metric cards - compact for mobile, individual for desktop"""
+    total_distance = metrics['total_distance']
+    total_runs = metrics['total_runs']
+    total_time = metrics['total_time']
+    avg_distance = metrics['avg_distance']
+    avg_pace_minutes = metrics['avg_pace_minutes']
     avg_hr = metrics['avg_hr']
     total_elevation = metrics['total_elevation']
     training_load = metrics['training_load']
@@ -81,8 +105,6 @@ def create_all_metric_cards(metrics, time_period):
     
     # Calculate derived values
     total_hours = total_time / 60
-    pace_minutes = int(avg_pace_seconds // 60) if not pd.isna(avg_pace_seconds) else 0
-    pace_seconds_val = int(avg_pace_seconds % 60) if not pd.isna(avg_pace_seconds) else 0
     load_per_week = training_load / (time_period / 7) if time_period else training_load
     
     # Determine HR zone
@@ -97,134 +119,91 @@ def create_all_metric_cards(metrics, time_period):
         else:
             hr_zone = "VO2 Max zone"
     
+    # Create compact summary card (shown on mobile)
+    compact_card = create_compact_summary_card(metrics, time_period)
+    
     # Card 1: Total Distance
-    card1_html = f"""
-    <div class="metric-card">
-        <span class="metric-icon">🏃‍♂️</span>
-        <div>
-            <div class="metric-value">{total_distance:.1f}<span class="metric-unit">km</span></div>
-            <div class="metric-label">Total Distance</div>
-            <div class="metric-subtitle">{total_distance/total_runs if total_runs > 0 else 0:.1f} km avg per run</div>
-        </div>
-        <div class="metric-change {'positive' if distance_change > 0 else 'negative' if distance_change < 0 else 'neutral'}">
-            {'↗' if distance_change > 0 else '↘' if distance_change < 0 else '→'} {abs(distance_change):.1f}%
-        </div>
-    </div>
-    """
+    distance_value = f"{format_number_with_commas(total_distance)} km"
+    card1_html = create_metric_card(
+        "Total Distance", 
+        distance_value, 
+        distance_change,
+        "🏃‍♂️", 
+        "#3b82f6"
+    )
     
     # Card 2: Total Runs
-    card2_html = f"""
-    <div class="metric-card">
-        <span class="metric-icon">📊</span>
-        <div>
-            <div class="metric-value">{total_runs}<span class="metric-unit">runs</span></div>
-            <div class="metric-label">Total Runs</div>
-            <div class="metric-subtitle">{total_runs/(time_period/7) if time_period else 0:.1f} per week</div>
-        </div>
-        <div class="metric-change {'positive' if runs_change > 0 else 'negative' if runs_change < 0 else 'neutral'}">
-            {'↗' if runs_change > 0 else '↘' if runs_change < 0 else '→'} {abs(runs_change):.1f}%
-        </div>
-    </div>
-    """
+    runs_value = f"{total_runs}"
+    card2_html = create_metric_card(
+        "Total Runs", 
+        runs_value, 
+        runs_change,
+        "📊", 
+        "#10b981"
+    )
     
     # Card 3: Total Time
     time_display = f"{total_hours:.1f}" if total_hours >= 1 else f"{total_time:.0f}"
     time_unit = "hrs" if total_hours >= 1 else "min"
-    
-    card3_html = f"""
-    <div class="metric-card">
-        <span class="metric-icon">⏱️</span>
-        <div>
-            <div class="metric-value">{time_display}<span class="metric-unit">{time_unit}</span></div>
-            <div class="metric-label">Total Time</div>
-            <div class="metric-subtitle">{format_time_from_minutes(total_time/total_runs) if total_runs > 0 else "-"} avg per run</div>
-        </div>
-    </div>
-    """
+    time_value = format_time_from_minutes(total_time)
+    card3_html = create_metric_card(
+        "Total Time", 
+        time_value, 
+        None,
+        "⏱️", 
+        "#f59e0b"
+    )
     
     # Card 4: Average Pace
-    card4_html = f"""
-    <div class="metric-card">
-        <span class="metric-icon">⚡</span>
-        <div>
-            <div class="metric-value">{pace_minutes}:{pace_seconds_val:02d}<span class="metric-unit">min/km</span></div>
-            <div class="metric-label">Average Pace</div>
-            <div class="metric-subtitle">per kilometer</div>
-        </div>
-    </div>
-    """
+    pace_value = format_pace_to_min_sec(avg_pace_minutes)
+    card4_html = create_metric_card(
+        "Avg Pace", 
+        pace_value, 
+        None,
+        "⚡", 
+        "#ef4444"
+    )
     
     # Card 5: Average Distance
-    card5_html = f"""
-    <div class="metric-card">
-        <span class="metric-icon">📏</span>
-        <div>
-            <div class="metric-value">{avg_distance:.1f}<span class="metric-unit">km</span></div>
-            <div class="metric-label">Avg Distance</div>
-            <div class="metric-subtitle">per run</div>
-        </div>
-    </div>
-    """
+    avg_distance_value = f"{avg_distance:.1f} km"
+    card5_html = create_metric_card(
+        "Avg Distance", 
+        avg_distance_value, 
+        None,
+        "📏", 
+        "#8b5cf6"
+    )
     
     # Card 6: Heart Rate
-    if not pd.isna(avg_hr):
-        card6_html = f"""
-        <div class="metric-card">
-            <span class="metric-icon">❤️</span>
-            <div>
-                <div class="metric-value">{avg_hr:.0f}<span class="metric-unit">bpm</span></div>
-                <div class="metric-label">Avg Heart Rate</div>
-                <div class="metric-subtitle">{hr_zone}</div>
-            </div>
-        </div>
-        """
-    else:
-        card6_html = f"""
-        <div class="metric-card" style="opacity: 0.6;">
-            <span class="metric-icon">❤️</span>
-            <div>
-                <div class="metric-value">-<span class="metric-unit"></span></div>
-                <div class="metric-label">Avg Heart Rate</div>
-                <div class="metric-subtitle">No HR data</div>
-            </div>
-        </div>
-        """
+    hr_value = f"{avg_hr:.0f} bpm" if avg_hr and not pd.isna(avg_hr) else "No data"
+    card6_html = create_metric_card(
+        "Avg Heart Rate", 
+        hr_value, 
+        None,
+        "❤️", 
+        "#f97316"
+    )
     
     # Card 7: Training Load
-    card7_html = f"""
-    <div class="metric-card">
-        <span class="metric-icon">🔥</span>
-        <div>
-            <div class="metric-value">{training_load:.0f}<span class="metric-unit">pts</span></div>
-            <div class="metric-label">Training Load</div>
-            <div class="metric-subtitle">{load_per_week:.0f} per week</div>
-        </div>
-    </div>
-    """
+    load_value = f"{training_load:.0f}"
+    card7_html = create_metric_card(
+        "Training Load", 
+        load_value, 
+        None,
+        "🔥", 
+        "#84cc16"
+    )
     
     # Card 8: Elevation Gain
-    if not pd.isna(total_elevation) and total_elevation > 0:
-        card8_html = f"""
-        <div class="metric-card">
-            <span class="metric-icon">⛰️</span>
-            <div>
-                <div class="metric-value">{total_elevation:,.0f}<span class="metric-unit">m</span></div>
-                <div class="metric-label">Elevation Gain</div>
-                <div class="metric-subtitle">{total_elevation/total_runs if total_runs > 0 else 0:.0f}m avg per run</div>
-            </div>
-        </div>
-        """
-    else:
-        card8_html = f"""
-        <div class="metric-card" style="opacity: 0.6;">
-            <span class="metric-icon">⛰️</span>
-            <div>
-                <div class="metric-value">-<span class="metric-unit"></span></div>
-                <div class="metric-label">Elevation Gain</div>
-                <div class="metric-subtitle">No elevation data</div>
-            </div>
-        </div>
-        """
+    elevation_value = f"{format_number_with_commas(total_elevation)} m"
+    card8_html = create_metric_card(
+        "Total Elevation", 
+        elevation_value, 
+        None,
+        "⛰️", 
+        "#06b6d4"
+    )
     
-    return [card1_html, card2_html, card3_html, card4_html, 
+    # Return compact card first (for mobile), then individual cards (for desktop)
+    return [compact_card, card1_html, card2_html, card3_html, card4_html, 
             card5_html, card6_html, card7_html, card8_html] 
