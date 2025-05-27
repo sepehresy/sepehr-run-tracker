@@ -178,9 +178,17 @@ logs/
 data/
 uploads/
 
-# Screenshots directory structure (keep folder, ignore images)
+# Screenshots directory structure (keep folder, ignore random images but allow specific ones)
 screenshots/*.png
 screenshots/*.jpg
 screenshots/*.jpeg
 screenshots/*.gif
-!screenshots/.gitkeep 
+!screenshots/.gitkeep
+# Allow specific screenshot files for documentation
+!screenshots/login.png
+!screenshots/analytics-dashboard.png
+!screenshots/advanced-analytics.png
+!screenshots/route-analysis.png
+!screenshots/training-load.png
+!screenshots/race-planning.png
+!screenshots/pace-calculator.png 
