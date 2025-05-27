@@ -9,12 +9,12 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="runtracker",
     version="1.0.0",
-    author="RunTracker Team",
-    author_email="support@runtracker.com",
+    author="Sepehr",
+    author_email="",
     description="Your intelligent running companion - A comprehensive running analytics dashboard",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/sepehr-run-tracker",
+    url="https://github.com/sepehresy/sepehr-run-tracker",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",

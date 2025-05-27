@@ -74,7 +74,7 @@ Monitor your training load and recovery status with **AI-driven insights** and a
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/sepehr-run-tracker.git
+   git clone https://github.com/sepehresy/sepehr-run-tracker.git
    cd sepehr-run-tracker
    ```
 
@@ -166,14 +166,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **Strava API** for running data integration
-- **OpenStreetMap** for route visualization
 - **Plotly** for interactive charting capabilities
 - **Streamlit** for the amazing web framework
+- **Pandas** for data processing capabilities
+- **OpenAI** for AI-powered features
 
 ## 📞 Support
 
-For support, email support@runtracker.com or create an issue in this repository.
+For support, create an issue in this repository.
 
 ---
 

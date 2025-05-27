@@ -13,7 +13,7 @@ Thank you for your interest in contributing to RunTracker! We welcome contributi
 
 1. **Fork the repository**
    ```bash
-   git clone https://github.com/yourusername/sepehr-run-tracker.git
+   git clone https://github.com/sepehresy/sepehr-run-tracker.git
    cd sepehr-run-tracker
    ```
 
