@@ -32,7 +32,7 @@ def get_statistics_css():
         padding: 0.5rem;
         max-width: 100%;
         margin: 0 auto;
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%) !important;
+        background: #111827 !important;
         min-height: 100vh;
     }
     
@@ -43,7 +43,7 @@ def get_statistics_css():
     
     /* Dark theme for main app */
     .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%) !important;
+        background: #111827 !important;
         color: #f8fafc !important;
     }
     
@@ -55,7 +55,7 @@ def get_statistics_css():
         text-align: center;
         margin-bottom: 1.5rem;
         padding: 1.5rem;
-        background: rgba(15, 23, 42, 0.8) !important;
+        background: rgba(15, 23, 42, 0.95) !important;
         backdrop-filter: blur(20px);
         border: 1px solid rgba(148, 163, 184, 0.2);
         border-radius: 16px;
@@ -95,7 +95,7 @@ def get_statistics_css():
     
     /* Mobile: Compact summary card */
     .metric-summary-card {
-        background: rgba(30, 41, 59, 0.9) !important;
+        background: rgba(30, 41, 59, 0.8) !important;
         backdrop-filter: blur(20px);
         border: 1px solid rgba(148, 163, 184, 0.2) !important;
         border-radius: 16px;
@@ -117,14 +117,14 @@ def get_statistics_css():
     .metric-summary-item {
         text-align: center;
         padding: 0.75rem;
-        background: rgba(51, 65, 85, 0.5);
+        background: rgba(30, 41, 59, 0.6);
         border-radius: 12px;
         border: 1px solid rgba(148, 163, 184, 0.1);
         transition: all 0.2s ease;
     }
     
     .metric-summary-item:hover {
-        background: rgba(71, 85, 105, 0.7);
+        background: rgba(51, 65, 85, 0.8);
         transform: translateY(-2px);
         border-color: rgba(148, 163, 184, 0.3);
     }
@@ -157,7 +157,7 @@ def get_statistics_css():
     /* Desktop: Individual cards */
     .metric-card {
         /* Beautiful dark card design with proper contrast */
-        background: rgba(30, 41, 59, 0.9) !important;
+        background: rgba(30, 41, 59, 0.8) !important;
         backdrop-filter: blur(20px);
         border: 1px solid rgba(148, 163, 184, 0.2) !important;
         border-radius: 16px;
@@ -286,14 +286,14 @@ def get_statistics_css():
        ============================================== */
     
     .section-header {
-        font-size: 1.5rem;
+        font-size: 1.25rem;
         font-weight: 700;
         color: #f8fafc !important;
         margin: 2rem 0 1rem 0;
         text-align: center;
         border-bottom: 2px solid rgba(148, 163, 184, 0.3);
         padding: 1rem;
-        background: rgba(15, 23, 42, 0.8);
+        background: rgba(30, 41, 59, 0.7);
         backdrop-filter: blur(20px);
         border-radius: 12px 12px 0 0;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -305,7 +305,7 @@ def get_statistics_css():
        ============================================== */
     
     .chart-container {
-        background: rgba(30, 41, 59, 0.9) !important;
+        background: rgba(30, 41, 59, 0.8) !important;
         backdrop-filter: blur(20px);
         border: 1px solid rgba(148, 163, 184, 0.2);
         border-radius: 16px;
@@ -339,7 +339,7 @@ def get_statistics_css():
        ============================================== */
     
     .workout-legend {
-        background: rgba(15, 23, 42, 0.9) !important;
+        background: rgba(30, 41, 59, 0.7) !important;
         backdrop-filter: blur(20px);
         border: 1px solid rgba(148, 163, 184, 0.2);
         border-radius: 12px;
@@ -371,14 +371,14 @@ def get_statistics_css():
         color: #cbd5e1 !important;
         font-weight: 500;
         padding: 0.5rem;
-        background: rgba(51, 65, 85, 0.5);
+        background: rgba(30, 41, 59, 0.6);
         border-radius: 8px;
         transition: all 0.2s ease;
         border: 1px solid rgba(148, 163, 184, 0.1);
     }
     
     .legend-item:hover {
-        background: rgba(71, 85, 105, 0.7);
+        background: rgba(51, 65, 85, 0.8);
         transform: translateY(-1px);
         border-color: rgba(148, 163, 184, 0.3);
     }
@@ -388,7 +388,7 @@ def get_statistics_css():
        ============================================== */
     
     .insight-card {
-        background: rgba(30, 41, 59, 0.9) !important;
+        background: rgba(30, 41, 59, 0.8) !important;
         backdrop-filter: blur(20px);
         border: 1px solid rgba(148, 163, 184, 0.2);
         border-left: 4px solid #3b82f6;
@@ -540,12 +540,12 @@ def get_statistics_css():
         .metric-card:hover,
         .metric-summary-item:hover {
             transform: none;
-        }
-        
+    }
+    
         .metric-icon {
             transition: none;
-        }
-        
+    }
+    
         .metric-card:hover .metric-icon {
             transform: none;
         }
@@ -557,8 +557,8 @@ def get_statistics_css():
         .metric-summary-card {
             border-width: 3px !important;
             border-color: #ffffff !important;
-        }
-        
+    }
+    
         .metric-title,
         .metric-value,
         .metric-summary-label,
@@ -616,8 +616,8 @@ def get_statistics_css():
         
         .metric-grid {
             grid-template-columns: repeat(4, 1fr);
-        }
-        
+    }
+    
         .metric-title,
         .metric-value,
         .metric-summary-label,
@@ -625,7 +625,7 @@ def get_statistics_css():
         .section-header,
         .chart-title {
             color: #000000 !important;
-        }
+    }
     }
     </style>
     """

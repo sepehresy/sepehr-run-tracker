@@ -5,6 +5,32 @@ All notable changes to RunTracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-01-27
+
+### 🎨 UI/UX Improvements
+- **Enhanced Dark Theme**: Updated statistics view with darker background colors for better visual hierarchy
+- **Background Customization**: Changed main background to dark grey (#111827) for improved visual comfort
+- **Component Styling**: Updated all metric cards, chart containers, and UI components with darker, more cohesive color scheme
+
+### 🗂️ Project Organization
+- **Documentation Restructure**: Created `docs/` folder and moved all test files and design documentation
+- **Cleaner Root Directory**: Organized project structure by moving test files, design guides, and documentation to dedicated folder
+
+### 🔧 Bug Fixes & Code Quality
+- **Removed AI Analysis View**: Eliminated unused AI analysis feature that was not providing value
+- **Fixed Import Errors**: Corrected race planning import path issues
+- **Resolved Syntax Errors**: Fixed indentation problems in pace calculator and statistics modules
+- **Error Handling**: Fixed UnboundLocalError in workout type detection function
+
+### 📁 Files Moved to `docs/` Folder
+- Test files: `test_pace_calculator_ui.py`, `validate_ui.py`, `test_ui_responsiveness.py`, `test_pace_fix.py`
+- Documentation: `DESIGN_SYSTEM.md`, `MOBILE_TESTING_GUIDE.md`, `MODULAR_STRUCTURE.md`
+- Test results: `PACE_CALCULATOR_UI_TEST_RESULTS.md`, `PACE_CALCULATOR_MOBILE_TEST.md`, `QUICK_MOBILE_TEST.md`, `SIMPLE_PACE_CALCULATOR.md`
+
+### 🎯 Navigation Improvements
+- **Simplified Menu**: Removed "🧠 AI Analysis" from sidebar navigation
+- **Cleaner Interface**: Streamlined user experience by removing non-functional features
+
 ## [1.0.0] - 2025-05-27
 
 ### 🎉 Initial Release

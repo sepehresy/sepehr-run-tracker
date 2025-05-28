@@ -235,7 +235,7 @@ def render_pace_calculator():
     
     # Apply CSS
     st.markdown(get_simple_css(), unsafe_allow_html=True)
-    
+
     # Sidebar version
     st.sidebar.markdown(f'<div style="position:fixed;bottom:1.5rem;left:0;width:100%;text-align:left;{APP_VERSION_STYLE}color:{APP_VERSION_COLOR};">v{APP_VERSION}</div>', unsafe_allow_html=True)
     
@@ -254,9 +254,9 @@ def render_pace_calculator():
         <div class="row-title">🏃‍♂️ Enter Pace → Get Times</div>
     </div>
     """, unsafe_allow_html=True)
-    
+
     pace_input = st.text_input("Enter pace per km (MM:SS)", placeholder="5:00", key="pace_input")
-    
+        
     if pace_input:
         pace_td = parse_pace_input(pace_input)
         if pace_td:
