@@ -12,9 +12,9 @@ def generate_insights(df_filtered, time_period):
         return insights
     
     # Pace consistency analysis
-    if not df_filtered['pace_seconds'].dropna().empty:
-        pace_std = df_filtered['pace_seconds'].std()
-        pace_mean = df_filtered['pace_seconds'].mean()
+    if not df_filtered['pace_minutes'].dropna().empty:
+        pace_std = df_filtered['pace_minutes'].std()
+        pace_mean = df_filtered['pace_minutes'].mean()
         cv = (pace_std / pace_mean) * 100 if pace_mean > 0 else 0
         
         if cv < 10:
@@ -80,10 +80,10 @@ def generate_insights(df_filtered, time_period):
     
     # Performance trend analysis
     if len(df_filtered) >= 10:
-        pace_data = df_filtered.dropna(subset=['pace_seconds']).sort_values('Date')
+        pace_data = df_filtered.dropna(subset=['pace_minutes']).sort_values('Date')
         if len(pace_data) >= 10:
-            recent_pace = pace_data.tail(5)['pace_seconds'].mean()
-            earlier_pace = pace_data.head(5)['pace_seconds'].mean()
+            recent_pace = pace_data.tail(5)['pace_minutes'].mean()
+            earlier_pace = pace_data.head(5)['pace_minutes'].mean()
             pace_improvement = ((earlier_pace - recent_pace) / earlier_pace * 100) if earlier_pace > 0 else 0
             
             if pace_improvement > 5:

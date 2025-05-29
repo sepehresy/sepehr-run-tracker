@@ -167,14 +167,21 @@ def render_metric_cards(metrics, time_period):
     """Render all metric cards"""
     st.markdown('<div class="metric-grid">', unsafe_allow_html=True)
     
-    # Create all 8 cards using the metric cards module
+    # Create all cards (compact + individual)
     cards = create_all_metric_cards(metrics, time_period)
     
-    # Display cards in 8 columns
+    # First card is the compact summary (shown on mobile only)
+    compact_card = cards[0]
+    individual_cards = cards[1:]  # Remaining 8 cards (shown on desktop only)
+    
+    # Display compact card (mobile)
+    st.markdown(compact_card, unsafe_allow_html=True)
+    
+    # Display individual cards in 8 columns (desktop)
     col1, col2, col3, col4, col5, col6, col7, col8 = st.columns(8)
     columns = [col1, col2, col3, col4, col5, col6, col7, col8]
     
-    for i, card_html in enumerate(cards):
+    for i, card_html in enumerate(individual_cards):
         with columns[i]:
             st.markdown(card_html, unsafe_allow_html=True)
     
@@ -318,12 +325,20 @@ def render_advanced_analytics(df_filtered):
                 <span>Long Run</span>
             </div>
             <div class="legend-item">
-                <span style="color: #6b7280; font-size: 1.2rem;">●</span>
-                <span>Default</span>
+                <span style="color: #8b5cf6; font-size: 1.2rem;">▲</span>
+                <span>Trail Run</span>
+            </div>
+            <div class="legend-item">
+                <span style="color: #06b6d4; font-size: 1.2rem;">○</span>
+                <span>Recovery</span>
             </div>
             <div class="legend-item">
                 <span style="color: #10b981; font-size: 1.2rem;">■</span>
                 <span>Commute</span>
+            </div>
+            <div class="legend-item">
+                <span style="color: #6b7280; font-size: 1.2rem;">●</span>
+                <span>Default</span>
             </div>
         </div>
     </div>
@@ -337,8 +352,8 @@ def render_advanced_analytics(df_filtered):
         st.markdown('<h3 class="chart-title">🎯 Distance vs Pace Correlation</h3>', unsafe_allow_html=True)
         
         fig_dist_pace = create_correlation_chart(
-            df_filtered, 'Distance (km)', 'pace_seconds', 
-            'Distance vs Pace', 'Distance (km)', 'Pace (min/km)'
+            df_filtered, 'Distance (km)', 'pace_minutes', 
+            'Distance vs Pace', 'Distance (km)', 'Pace'
         )
         if fig_dist_pace:
             st.plotly_chart(fig_dist_pace, use_container_width=True, key="scatter_chart")
@@ -387,8 +402,8 @@ def render_advanced_analytics(df_filtered):
         st.markdown('<h3 class="chart-title">⚡💓 Pace vs Heart Rate</h3>', unsafe_allow_html=True)
         
         fig_pace_hr = create_correlation_chart(
-            df_filtered, 'pace_seconds', 'Avg HR',
-            'Pace vs Heart Rate', 'Pace (min/km)', 'Average Heart Rate (bpm)'
+            df_filtered, 'pace_minutes', 'Avg HR',
+            'Pace vs Heart Rate', 'Pace', 'Average Heart Rate (bpm)'
         )
         if fig_pace_hr:
             st.plotly_chart(fig_pace_hr, use_container_width=True, key="pace_hr_chart")
@@ -420,8 +435,8 @@ def render_advanced_analytics(df_filtered):
         st.markdown('<h3 class="chart-title">🕐 Time vs Pace Efficiency</h3>', unsafe_allow_html=True)
         
         fig_time_pace = create_correlation_chart(
-            df_filtered, 'moving_time_minutes', 'pace_seconds',
-            'Time vs Pace', 'Moving Time (minutes)', 'Pace (min/km)'
+            df_filtered, 'moving_time_minutes', 'pace_minutes',
+            'Time vs Pace', 'Moving Time (minutes)', 'Pace'
         )
         if fig_time_pace:
             st.plotly_chart(fig_time_pace, use_container_width=True, key="time_pace_chart")

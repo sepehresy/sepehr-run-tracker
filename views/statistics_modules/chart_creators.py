@@ -9,10 +9,24 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from .data_processing import (
     aggregate_data_by_time, 
+    format_pace_to_min_sec, 
     detect_workout_type, 
     get_workout_type_style
 )
 
+# Cache for workout type detection to improve performance
+_workout_type_cache = {}
+
+def get_cached_workout_type(row_hash, row):
+    """Get workout type with caching for better performance"""
+    if row_hash not in _workout_type_cache:
+        _workout_type_cache[row_hash] = detect_workout_type(row)
+    return _workout_type_cache[row_hash]
+
+def clear_workout_type_cache():
+    """Clear the workout type cache"""
+    global _workout_type_cache
+    _workout_type_cache = {}
 
 def create_distance_chart(df_filtered, time_aggregation):
     """Create distance over time chart"""
@@ -81,19 +95,18 @@ def create_distance_chart(df_filtered, time_aggregation):
 
 def create_pace_trend_chart(df_filtered, time_aggregation):
     """Create pace trends chart"""
-    pace_data = df_filtered.dropna(subset=['pace_seconds']).copy()
+    pace_data = df_filtered.dropna(subset=['pace_minutes']).copy()
     if pace_data.empty:
         return None
     
-    # Convert pace back to minutes for display and filter out unrealistic values
-    pace_data['pace_display'] = pace_data['pace_seconds'] / 60
-    pace_data = pace_data[pace_data['pace_display'] <= 12]
+    # Filter out unrealistic values (pace is already in min/km)
+    pace_data = pace_data[pace_data['pace_minutes'] <= 12]
     
     if pace_data.empty:
         return None
     
     df_plot, x_title, hover_template = aggregate_data_by_time(
-        pace_data, time_aggregation, 'pace_display', 'mean'
+        pace_data, time_aggregation, 'pace_minutes', 'mean'
     )
     
     if time_aggregation == "daily":
@@ -101,26 +114,32 @@ def create_pace_trend_chart(df_filtered, time_aggregation):
         fig = px.line(
             df_plot.sort_values('Date'),
             x='Date',
-            y='pace_display',
+            y='pace_minutes',
             title="",
             color_discrete_sequence=['#8b5cf6']
         )
         fig.update_traces(
             line=dict(width=3),
-            hovertemplate='<b>%{y:.2f} min/km</b><br>%{x}<extra></extra>'
+            hovertemplate='<b>%{customdata}</b><br>%{x}<extra></extra>',
+            customdata=[format_pace_to_min_sec(pace) for pace in df_plot['pace_minutes']]
         )
     else:
         # Use bar chart for weekly, monthly, yearly data
         fig = px.bar(
             df_plot.sort_values('Date'),
             x='Date',
-            y='pace_display',
+            y='pace_minutes',
             title="",
             color_discrete_sequence=['#8b5cf6']
         )
         fig.update_traces(
-            hovertemplate=hover_template.replace(':.1f', ':.2f') + ' min/km'
+            hovertemplate='<b>%{customdata}</b><br>' + x_title.lower() + ' %{x}<extra></extra>',
+            customdata=[format_pace_to_min_sec(pace) for pace in df_plot['pace_minutes']]
         )
+    
+    # Create custom y-axis tick labels in min:sec format
+    y_tick_vals = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    y_tick_text = [format_pace_to_min_sec(val) for val in y_tick_vals]
     
     fig.update_layout(
         plot_bgcolor='rgba(0,0,0,0)',
@@ -135,9 +154,11 @@ def create_pace_trend_chart(df_filtered, time_aggregation):
         yaxis=dict(
             showgrid=True, 
             gridcolor='#f3f4f6',
-            title="Pace (min/km)",
+            title="Pace",
             title_font=dict(size=14, color="#6b7280"),
-            range=[3, 12]  # Set reasonable y-axis range for running paces
+            range=[3, 12],  # Set reasonable y-axis range for running paces
+            tickvals=y_tick_vals,
+            ticktext=y_tick_text
         ),
         margin=dict(l=0, r=0, t=20, b=0),
         height=300
@@ -207,13 +228,12 @@ def create_heart_rate_chart(df_filtered, time_aggregation):
 
 def create_pace_distribution_chart(df_filtered):
     """Create pace distribution histogram"""
-    pace_data = df_filtered['pace_seconds'].dropna()
+    pace_data = df_filtered['pace_minutes'].dropna()
     if pace_data.empty:
         return None
     
-    # Convert to minutes and filter out unrealistic values
-    pace_minutes = pace_data / 60
-    pace_minutes = pace_minutes[pace_minutes <= 12]  # Filter out pace above 12 min/km
+    # Filter out unrealistic values (pace is already in min/km)
+    pace_minutes = pace_data[pace_data <= 12]  # Filter out pace above 12 min/km
     
     if pace_minutes.empty:
         return None
@@ -224,16 +244,23 @@ def create_pace_distribution_chart(df_filtered):
         title="",
         color_discrete_sequence=['#8b5cf6']
     )
+    
+    # Create custom x-axis tick labels in min:sec format
+    x_tick_vals = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    x_tick_text = [format_pace_to_min_sec(val) for val in x_tick_vals]
+    
     fig.update_layout(
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
         font=dict(family="Inter, sans-serif", size=12, color="#374151"),
         xaxis=dict(
-            title="Pace (min/km)", 
+            title="Pace", 
             showgrid=True, 
             gridcolor='#f3f4f6',
             title_font=dict(size=14, color="#6b7280"),
-            range=[3, 12]  # Set reasonable x-axis range for running paces
+            range=[3, 12],  # Set reasonable x-axis range for running paces
+            tickvals=x_tick_vals,
+            ticktext=x_tick_text
         ),
         yaxis=dict(
             title="Frequency", 
@@ -633,12 +660,14 @@ def create_correlation_chart(df_filtered, x_col, y_col, title, x_label, y_label,
     valid_data = valid_data.copy()
     valid_data['workout_type'] = valid_data.apply(detect_workout_type, axis=1)
     
-    # For pace data, filter out unrealistic values
-    if 'pace' in y_col.lower():
-        valid_data['pace_minutes'] = valid_data[y_col] / 60
-        valid_data = valid_data[valid_data['pace_minutes'] <= 12]
-        y_col = 'pace_minutes'
-        y_label = "Pace (min/km)"
+    # For pace data, filter out unrealistic values (pace is already in min/km)
+    if 'pace' in x_col.lower() and 'minutes' in x_col.lower():
+        valid_data = valid_data[valid_data[x_col] <= 12]
+        x_label = "Pace"
+    
+    if 'pace' in y_col.lower() and 'minutes' in y_col.lower():
+        valid_data = valid_data[valid_data[y_col] <= 12]
+        y_label = "Pace"
     
     if valid_data.empty or len(valid_data) <= 3:
         return None
@@ -661,34 +690,55 @@ def create_correlation_chart(df_filtered, x_col, y_col, title, x_label, y_label,
                 symbol=style['symbol'],
                 line=dict(width=1, color='white')
             ),
-            hovertemplate=f'<b>%{{text}}</b><br><b>{x_label}: %{{x:.1f}}</b><br><b>{y_label}: %{{y:.2f}}</b><extra></extra>',
+            hovertemplate=f'<b>%{{text}}</b><br><b>{x_label}: %{{customdata[0]}}</b><br><b>{y_label}: %{{customdata[1]}}</b><extra></extra>',
+            customdata=[[
+                format_pace_to_min_sec(x) if 'pace' in x_label.lower() else f"{x:.1f}",
+                format_pace_to_min_sec(y) if 'pace' in y_label.lower() else f"{y:.1f}"
+            ] for x, y in zip(type_data[x_col], type_data[y_col])],
             text=[workout_type] * len(type_data)
         ))
+    
+    # Create custom tick labels for pace axes
+    pace_tick_vals = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    pace_tick_text = [format_pace_to_min_sec(val) for val in pace_tick_vals]
+    
+    xaxis_config = dict(
+        title=x_label, 
+        showgrid=True, 
+        gridcolor='#f3f4f6',
+        title_font=dict(size=14, color="#6b7280")
+    )
+    yaxis_config = dict(
+        title=y_label, 
+        showgrid=True, 
+        gridcolor='#f3f4f6',
+        title_font=dict(size=14, color="#6b7280")
+    )
+    
+    # Set reasonable axis ranges and custom ticks for pace charts
+    if 'pace' in x_label.lower():
+        xaxis_config.update({
+            'range': [3, 12],
+            'tickvals': pace_tick_vals,
+            'ticktext': pace_tick_text
+        })
+    if 'pace' in y_label.lower():
+        yaxis_config.update({
+            'range': [3, 12],
+            'tickvals': pace_tick_vals,
+            'ticktext': pace_tick_text
+        })
     
     fig.update_layout(
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
         font=dict(family="Inter, sans-serif", size=12, color="#374151"),
-        xaxis=dict(
-            title=x_label, 
-            showgrid=True, 
-            gridcolor='#f3f4f6',
-            title_font=dict(size=14, color="#6b7280")
-        ),
-        yaxis=dict(
-            title=y_label, 
-            showgrid=True, 
-            gridcolor='#f3f4f6',
-            title_font=dict(size=14, color="#6b7280")
-        ),
+        xaxis=xaxis_config,
+        yaxis=yaxis_config,
         margin=dict(l=0, r=0, t=20, b=0),
         height=300,
         showlegend=False  # Hide legend since we have the workout type legend above
     )
-    
-    # Set reasonable y-axis range for pace charts
-    if 'pace' in y_label.lower():
-        fig.update_yaxes(range=[3, 12])
     
     return fig
 
