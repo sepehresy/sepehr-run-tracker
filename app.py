@@ -5,6 +5,7 @@ st.set_page_config(page_title="Sepehr's Running Dashboard", layout="wide")
 import pandas as pd
 from datetime import datetime
 from views.activities import render_activities
+from views.activities_modern import show_modern_activities
 from views.race_planning import render_race_planning
 from views.runner_profile import render_runner_profile
 from views.fatigue_analysis import render_fatigue_analysis
@@ -420,7 +421,7 @@ else:
 
     # Sidebar navigation
     # st.sidebar.title("📁 Dashboard View")
-    view = st.sidebar.radio("Navigate to:", ["📈 Statistics", "📂 Activities", "🏁 Race Planning", "⏱️ Pace Calculator", "🧍 Runner Profile", "📊 Fatigue Analysis"])
+    view = st.sidebar.radio("Navigate to:", ["📈 Statistics", "📂 Activities", "🎨 Activities (Modern)", "🏁 Race Planning", "⏱️ Pace Calculator", "🧍 Runner Profile", "📊 Fatigue Analysis"])
 
     st.sidebar.markdown(f'<div style="position:fixed;bottom:1.5rem;left:0;width:100%;text-align:left;{APP_VERSION_STYLE}color:{APP_VERSION_COLOR};">v{APP_VERSION}</div>', unsafe_allow_html=True)
 
@@ -441,6 +442,11 @@ else:
 
     elif view == "📂 Activities":
         render_activities(df, user_info, gist_id, gist_filename, github_token)
+
+    elif view == "🎨 Activities (Modern)":
+        # Store activities data in session state for the modern view
+        st.session_state.activities_data = df
+        show_modern_activities()
 
     elif view == "🏁 Race Planning":
         render_race_planning(df, today, user_info, gist_id, gist_filename, github_token)    

@@ -5,6 +5,72 @@ All notable changes to RunTracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2025-01-28
+
+### 🚀 Major Feature: Modern Activities View
+
+#### ✨ New Activities Dashboard
+- **Complete Redesign**: Modern card-based activity view with enhanced data visualization
+- **Streamlined Table**: Simplified activity table showing only essential columns (Date, Name, Sport Type, Type, Workout Type, Description, Distance, Pace, Time)
+- **Intelligent Column Management**: Hidden non-essential columns while preserving all data for detailed views
+
+#### 🎯 Activity Detail Cards
+- **Activity Header Card**: Comprehensive activity summary with name, date, sport type, workout type, and all key metrics
+- **Performance Analysis Card**: Advanced metrics including power analysis, performance ratings, training load, elevation analysis
+- **Dynamic Content**: Cards automatically populate with available data, gracefully handling missing values
+
+#### 📊 Enhanced Lap Analysis
+- **Dual-Chart System**: 
+  - Top chart (67% height): Variable-width pace bars proportional to lap distance with color-coded performance
+  - Bottom chart (33% height): Heart rate and power trends with dual y-axes
+- **Complete Data Extraction**: Parses lap details to extract pace, time, HR, cadence, power, and elevation gain
+- **Comprehensive Table**: Lap breakdown with all available metrics per lap
+
+#### 📈 New Horizontal Lap Chart
+- **Right Sidebar Chart**: Horizontal bar chart (800px height) showing pace comparison across all laps
+- **Performance Color Coding**: Green (fast), blue (medium), red (slow) bars based on relative performance
+- **Inline Metrics**: Pace, heart rate, and elevation displayed directly alongside each bar (15px font)
+- **Average Pace Reference**: Dashed red line showing overall average pace
+
+#### 🗺️ Improved Route Visualization
+- **Terrain View**: Switched from dark theme to topographical terrain view for better route understanding
+- **Clean Design**: Removed header cards for streamlined map display
+- **Enhanced Markers**: Clear start (green) and finish (red) markers with route line visualization
+
+### 🛠️ Technical Improvements
+
+#### 🔧 Robust Data Handling
+- **Safe Float Conversion**: Added `safe_float_convert()` function to handle 'N/A', null, and invalid values
+- **Error Prevention**: Eliminated "could not convert string to float" errors throughout the application
+- **Data Integrity**: Preserved all original data while controlling display presentation
+
+#### 📱 Responsive Layout
+- **Two-Column Design**: Left column (2/3 width) for main content, right column (1/3 width) for secondary info
+- **Mobile-First**: Responsive design that works across all device sizes
+- **Modern CSS**: Glass-morphism effects, dark theme, and enhanced visual hierarchy
+
+#### 🎨 UI/UX Enhancements
+- **Card-Based Design**: Modern card system with hover effects and shadows
+- **Color-Coded Performance**: Intuitive color schemes for quick performance assessment
+- **Clean Information Architecture**: Logical flow from activity selection to detailed analysis
+
+### 🧹 Code Quality & Cleanup
+- **File Organization**: Moved `layout_designer.py` to docs folder
+- **Removed Debug Files**: Cleaned up 7+ temporary debugging files (`check_columns.py`, `debug_selection.py`, etc.)
+- **Optimized Imports**: Consolidated and cleaned import statements
+- **Enhanced Documentation**: Comprehensive inline documentation for all new functions
+
+### 🐛 Bug Fixes
+- **Activity Selection**: Fixed activity selection and data flow between table and detail views
+- **Data Type Errors**: Resolved float conversion errors with robust error handling
+- **Chart Rendering**: Fixed Plotly chart configuration and annotation positioning
+- **Table Display**: Corrected column visibility while preserving underlying data
+
+### 📊 Data Processing Improvements
+- **Lap Data Parsing**: Enhanced regex patterns to extract all available lap metrics
+- **Flexible Format Support**: Support for various data formats (decimal HR, cadence, elevation)
+- **Missing Data Handling**: Graceful degradation when data is not available
+
 ## [1.4.0] - 2025-01-27
 
 ### 🎨 UI/UX Improvements
