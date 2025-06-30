@@ -1,42 +1,56 @@
 # GitHub Actions Workflows
 
-## Daily Auto Commit
+## Auto Wake on Push
 
 ### Purpose
-This workflow automatically makes a daily commit to keep your Streamlit app deployed on cloud platforms (like Streamlit Cloud) from going to sleep due to inactivity.
+This workflow automatically keeps your Streamlit app deployed on cloud platforms (like Streamlit Cloud) from going to sleep due to inactivity.
 
 ### How it works
-- **Schedule**: Runs daily at 2:00 AM UTC
-- **Action**: Updates the `.auto-commit-tracker` file with a timestamp
-- **Commit**: Makes an automated commit with a clear message indicating it's for app maintenance
-- **Manual Trigger**: Can also be manually triggered from the GitHub Actions tab
+- **Daily Schedule**: Runs automatically every day at 2:00 AM UTC
+- **Push Trigger**: Also runs when the `.wake-trigger` file is modified
+- **Action**: Updates the `.wake-trigger` file with a timestamp and commit info
+- **Commit**: Makes an automated commit to trigger Streamlit app redeployment
+- **Result**: Keeps your Streamlit app active and prevents it from sleeping
 
 ### Files
-- `daily-commit-clean.yml`: The main workflow file
+- `auto-wake-on-push.yml`: The main and only workflow file
+- `.wake-trigger`: File that tracks wake-up events and triggers the workflow
 
-### What it creates
-- `.auto-commit-tracker`: A small file that tracks when the last auto-commit happened
+### Automatic Operation
+The workflow runs completely automatically:
+- **Daily at 2:00 AM UTC**: Scheduled automatic execution
+- **No manual intervention needed**: Fully automated system
+- **Reliable**: Proven working solution
+
+### Manual Wake-Up (Optional)
+If you need to wake your app immediately:
+
+```bash
+# Method 1: Update the wake trigger file
+echo "Manual wake - $(date)" > .wake-trigger
+git add .wake-trigger
+git commit -m "Wake up Streamlit app"
+git push
+
+# Method 2: Simple touch and push
+echo "Wake up now" > .wake-trigger && git add . && git commit -m "Manual wake" && git push
+```
 
 ### Customization
-To change the schedule, modify the cron expression in the workflow file:
+To change the schedule, modify the cron expression in `auto-wake-on-push.yml`:
 ```yaml
 - cron: '0 2 * * *'  # Currently 2:00 AM UTC daily
 ```
 
-Common cron schedules:
+Common alternatives:
 - `0 0 * * *` - Daily at midnight UTC
 - `0 12 * * *` - Daily at noon UTC  
 - `0 0 * * 1` - Weekly on Mondays at midnight UTC
 
-### Manual Trigger
-You can manually trigger the workflow:
-1. Go to your repository on GitHub
-2. Click on "Actions" tab
-3. Select "Daily Auto Commit (Clean Version)"
-4. Click "Run workflow"
-
 ### Benefits
-- Keeps your Streamlit app active and prevents it from sleeping
-- Minimal impact on your codebase (only affects a dedicated tracker file)
-- Clear commit messages for easy identification
-- No impact on your main application files 
+- ✅ **Fully automated** - No manual intervention required
+- ✅ **Dual triggers** - Both scheduled and on-demand
+- ✅ **Minimal footprint** - Only affects the `.wake-trigger` file
+- ✅ **Proven working** - Successfully tested and operational
+- ✅ **Clean setup** - Single workflow handles everything
+- ✅ **Streamlit app stays active** - Never goes to sleep 
