@@ -1,0 +1,51 @@
+name: Daily Auto Commit
+
+on:
+  schedule:
+    # Runs daily at 2:00 AM UTC (adjust timezone as needed)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  auto-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Configure git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+    - name: Update version file with timestamp
+      run: |
+        # Remove existing auto-update line if present and add new one
+        sed -i '/^# Auto-update:/d' version.py
+        echo "# Auto-update: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> version.py
+        
+    - name: Check if there are changes
+      id: verify-changed-files
+      run: |
+        if git diff --quiet; then
+          echo "No changes detected"
+          echo "changed=false" >> $GITHUB_OUTPUT
+        else
+          echo "Changes detected"
+          echo "changed=true" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Commit and push changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      run: |
+        git add version.py
+        git commit -m "🤖 Daily auto-commit to keep Streamlit app active - $(date -u +"%Y-%m-%d")"
+        git push origin main
+        
+    - name: No changes to commit
+      if: steps.verify-changed-files.outputs.changed == 'false'
+      run: |
+        echo "No changes were made, skipping commit" 
