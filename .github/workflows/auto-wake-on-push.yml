@@ -1,0 +1,41 @@
+name: Auto Wake on Push
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.wake-trigger'
+  schedule:
+    # Runs daily at 2:00 AM UTC
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  wake-streamlit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Update wake trigger file
+      run: |
+        echo "Last wake-up: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" > .wake-trigger
+        echo "Commit hash: ${{ github.sha }}" >> .wake-trigger
+        echo "Triggered by: ${{ github.event_name }}" >> .wake-trigger
+        
+    - name: Commit and push wake trigger
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Auto-Wake"
+        git add .wake-trigger
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "🚀 Auto-wake Streamlit app - $(date -u +"%Y-%m-%d %H:%M")"
+          git push origin main
+        fi 
