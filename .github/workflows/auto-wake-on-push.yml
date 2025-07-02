@@ -22,17 +22,29 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: Update wake trigger file
+    - name: Update wake trigger and app file
       run: |
+        # Update wake trigger file
         echo "Last wake-up: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" > .wake-trigger
         echo "Commit hash: ${{ github.sha }}" >> .wake-trigger
         echo "Triggered by: ${{ github.event_name }}" >> .wake-trigger
         
-    - name: Commit and push wake trigger
+        # Update app.py with timestamp comment to trigger redeploy
+        if [ -f "app.py" ]; then
+          # Add timestamp comment at the top of app.py
+          sed -i '1i# Auto-wake timestamp: '"$(date -u +"%Y-%m-%d %H:%M:%S UTC")"'' app.py
+          # Remove old timestamp comments (keep only the latest one)
+          sed -i '2,/^[^#]/{ /^# Auto-wake timestamp:/d; }' app.py
+        fi
+        
+    - name: Commit and push changes
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action Auto-Wake"
         git add .wake-trigger
+        if [ -f "app.py" ]; then
+          git add app.py
+        fi
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
